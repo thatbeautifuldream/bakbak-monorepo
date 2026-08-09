@@ -46,7 +46,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "bakbak · Talk to the web",
+  title: "Bakbak · Talk to the web",
   description:
     "A voice companion that helps you understand any page without leaving it.",
   manifest: "/manifest.json",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "bakbak",
+    title: "Bakbak",
   },
 }
 

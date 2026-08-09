@@ -11,11 +11,11 @@ import {
   RiSparkling2Line,
   RiVolumeUpLine,
 } from "@remixicon/react"
-import { BrandMark, SiteHeader } from "@/components/site-header"
+import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 
 export const metadata: Metadata = {
-  title: "bakbak · Talk to the web",
+  title: "Bakbak · Talk to the web",
   description:
     "A voice companion that helps you understand any page without leaving it.",
 }
@@ -24,7 +24,7 @@ const moments = [
   {
     label: "Notice what matters",
     detail:
-      "BakBak takes in the page you are already reading, so you do not have to explain the context first.",
+      "Bakbak takes in the page you are already reading, so you do not have to explain the context first.",
     number: "01",
   },
   {
@@ -140,7 +140,7 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="mt-7 max-w-[32rem] text-base leading-7 text-[#5d5853] sm:text-lg dark:text-[#c9c0b6]">
-              BakBak is a voice companion that understands the page in front of
+              Bakbak is a voice companion that understands the page in front of
               you — so a question, a thought, or a useful detail is always
               within reach.
             </p>
@@ -244,7 +244,7 @@ export default function LandingPage() {
               Stay with the thought, not the tab.
             </h2>
             <p className="mt-5 max-w-xl text-base leading-7 text-[#c9c0b6]">
-              Sign in to begin using BakBak with the browser extension — your
+              Sign in to begin using Bakbak with the browser extension — your
               small voice companion for the pages that make you pause.
             </p>
           </div>
@@ -254,7 +254,7 @@ export default function LandingPage() {
             className="mt-9 h-12 shrink-0 rounded-full border-[#e95f45] bg-[#e95f45] px-5 text-[#fffaf2] shadow-[0_14px_28px_-18px_#000] hover:bg-[#bf4633] lg:mt-0"
           >
             <Link href="/login">
-              Try BakBak
+              Try Bakbak
               <RiPlayCircleLine className="size-[18px]" />
             </Link>
           </Button>
@@ -265,10 +265,9 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-xs text-[#756e68] sm:flex-row sm:items-center sm:justify-between dark:text-[#c9c0b6]">
           <Link
             href="/"
-            className="flex w-fit items-center gap-2 font-bold tracking-[-0.04em] text-[#24201e] dark:text-[#f8f1e8]"
+            className="w-fit text-sm font-bold tracking-[-0.04em] text-[#24201e] dark:text-[#f8f1e8]"
           >
-            <BrandMark className="size-6 rounded-lg text-[11px]" />
-            bakbak
+            Bakbak
           </Link>
           <p>Talk to the web, without leaving it.</p>
         </div>

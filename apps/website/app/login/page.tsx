@@ -16,13 +16,10 @@ function Brand() {
   return (
     <Link
       href="/"
-      aria-label="BakBak home"
-      className="flex w-fit items-center gap-2.5"
+      aria-label="Bakbak home"
+      className="w-fit text-lg font-bold tracking-[-0.05em]"
     >
-      <span className="grid size-8 place-items-center rounded-[10px] bg-[#e95f45] text-sm font-bold tracking-[-0.08em] text-[#fffaf2]">
-        b
-      </span>
-      <span className="text-base font-bold tracking-[-0.05em]">bakbak</span>
+      Bakbak
     </Link>
   )
 }
@@ -80,7 +77,7 @@ function LoginContent() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Brand />
           <p className="text-sm text-[#756e68] dark:text-[#c9c0b6]">
-            {isSignUp ? "Already a member?" : "New to BakBak?"}{" "}
+            {isSignUp ? "Already a member?" : "New to Bakbak?"}{" "}
             <button
               type="button"
               className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"
@@ -102,7 +99,7 @@ function LoginContent() {
             Take the web at your own pace.
           </h1>
           <p className="mt-7 max-w-md text-lg leading-7 text-[#5d5853] dark:text-[#c9c0b6]">
-            BakBak meets you on the page you are already reading. You decide
+            Bakbak meets you on the page you are already reading. You decide
             when the conversation begins.
           </p>
           <div className="mt-10 flex items-center gap-3 text-sm text-[#756e68] dark:text-[#c9c0b6]">
@@ -120,7 +117,7 @@ function LoginContent() {
             </div>
             <div className="mt-7 lg:mt-0">
               <p className="text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
-                {isSignUp ? "Join BakBak" : "Welcome back"}
+                {isSignUp ? "Join Bakbak" : "Welcome back"}
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em]">
                 {isSignUp
@@ -130,7 +127,7 @@ function LoginContent() {
               <p className="mt-3 text-sm leading-6 text-[#5d5853] dark:text-[#c9c0b6]">
                 {isSignUp
                   ? "Create your account to start talking through the web."
-                  : "Sign in to return to your BakBak space."}
+                  : "Sign in to return to your Bakbak space."}
               </p>
             </div>
 
@@ -191,7 +188,7 @@ function LoginContent() {
             </form>
           </div>
           <p className="mt-6 text-center text-sm text-[#756e68] dark:text-[#c9c0b6]">
-            {isSignUp ? "Already have an account?" : "New to BakBak?"}{" "}
+            {isSignUp ? "Already have an account?" : "New to Bakbak?"}{" "}
             <button
               type="button"
               className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"

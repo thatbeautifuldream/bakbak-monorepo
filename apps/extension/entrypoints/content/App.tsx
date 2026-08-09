@@ -114,12 +114,12 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           className="launcher"
           type="button"
           onClick={() => setIsOpen(true)}
-          aria-label="Open bakbak voice companion"
+          aria-label="Open Bakbak voice companion"
         >
           <span className="launcher-orb" aria-hidden="true">
             <SparklesIcon className="icon" />
           </span>
-          <span className="launcher-label">bakbak</span>
+          <span className="launcher-label">Bakbak</span>
         </button>
       </div>
     );
@@ -133,7 +133,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         ref={panelRef}
         tabIndex={-1}
         className="panel"
-        aria-label="bakbak voice companion"
+        aria-label="Bakbak voice companion"
         onKeyDown={(event) => event.key === "Escape" && setIsOpen(false)}
       >
         <header className="panel-header">
@@ -148,7 +148,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             className="button-icon"
             type="button"
             onClick={() => setIsOpen(false)}
-            aria-label="Close bakbak"
+            aria-label="Close Bakbak"
           >
             <XMarkIcon className="icon" aria-hidden="true" />
           </button>

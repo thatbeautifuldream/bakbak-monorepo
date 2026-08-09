@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   manifest: {
-    name: 'bakbak',
+    name: 'Bakbak',
     description: 'Listen to any page. Narrated with Sarvam voices.',
     // The worker reuses the web app session; the extension has no separate login.
     permissions: ['cookies', 'storage', 'tabs'],

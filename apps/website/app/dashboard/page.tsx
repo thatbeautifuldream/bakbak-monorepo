@@ -25,7 +25,7 @@ export default function DashboardPage() {
             <div>
               <p className="flex items-center gap-2 text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
                 <span className="size-2 rounded-full bg-[#e95f45] shadow-[0_0_0_5px_rgba(233,95,69,0.12)]" />
-                Your BakBak space
+                Your Bakbak space
               </p>
               <h1 className="mt-5 text-[clamp(2.6rem,5vw,4.35rem)] leading-[0.94] font-semibold tracking-[-0.075em]">
                 Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}.
@@ -61,7 +61,7 @@ export default function DashboardPage() {
                 Keep your curiosity in the same tab.
               </h2>
               <p className="mt-4 max-w-lg text-sm leading-6 text-[#c9c0b6]">
-                BakBak understands the page already in front of you. Ask for
+                Bakbak understands the page already in front of you. Ask for
                 clarity, a fact, or a different way to think about it — in your
                 own words.
               </p>

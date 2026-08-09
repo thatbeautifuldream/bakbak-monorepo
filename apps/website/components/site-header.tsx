@@ -2,17 +2,6 @@ import Link from "next/link"
 import { cookies } from "next/headers"
 import { Button } from "@/components/ui/button"
 
-export function BrandMark({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`grid size-8 place-items-center rounded-[10px] bg-[#e95f45] text-sm font-bold tracking-[-0.08em] text-[#fffaf2] ${className ?? ""}`}
-    >
-      b
-    </span>
-  )
-}
-
 export async function SiteHeader() {
   const cookieStore = await cookies()
   const isSignedIn = cookieStore.has("better-auth.session_token")
@@ -22,11 +11,10 @@ export async function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
         <Link
           href="/"
-          aria-label="BakBak home"
-          className="group flex items-center gap-2.5"
+          aria-label="Bakbak home"
+          className="text-lg font-bold tracking-[-0.05em]"
         >
-          <BrandMark className="transition-transform duration-300 group-hover:-rotate-6" />
-          <span className="text-base font-bold tracking-[-0.05em]">bakbak</span>
+          Bakbak
         </Link>
 
         <div className="flex items-center gap-3">
@@ -55,7 +43,7 @@ export async function SiteHeader() {
             className="h-10 rounded-full border-[#e95f45] bg-[#e95f45] px-4 text-sm text-[#fffaf2] shadow-[0_8px_20px_-14px_#bf4633] hover:bg-[#bf4633]"
           >
             <Link href={isSignedIn ? "/dashboard" : "/login"}>
-              {isSignedIn ? "Dashboard" : "Try BakBak"}
+              {isSignedIn ? "Dashboard" : "Try Bakbak"}
             </Link>
           </Button>
         </div>

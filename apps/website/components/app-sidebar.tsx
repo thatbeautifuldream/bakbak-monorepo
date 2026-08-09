@@ -72,13 +72,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <div className="px-2 py-1.5">
           <Link
             href="/dashboard"
-            aria-label="BakBak home"
-            className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            aria-label="Bakbak home"
+            className="rounded-xl px-2 py-1.5 text-lg font-bold tracking-[-0.05em] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
-            <span className="grid size-7 place-items-center rounded-[9px] bg-[#e95f45] text-xs font-bold tracking-[-0.08em] text-[#fffaf2]">
-              b
-            </span>
-            <span className="text-sm font-bold tracking-[-0.05em]">bakbak</span>
+            Bakbak
           </Link>
         </div>
       </SidebarHeader>
