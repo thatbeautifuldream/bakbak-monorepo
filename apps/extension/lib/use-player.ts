@@ -17,12 +17,23 @@ export interface VoiceSettings {
   rate: number;
 }
 
+const MIME_TYPES: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  opus: 'audio/ogg; codecs=opus',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  linear16: 'audio/wav',
+  mulaw: 'audio/basic',
+  alaw: 'audio/basic',
+};
+
 const toBlobUrl = (base64: string, codec: string) => {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return URL.createObjectURL(
-    new Blob([bytes], { type: codec === 'mp3' ? 'audio/mpeg' : `audio/${codec}` }),
+    new Blob([bytes], { type: MIME_TYPES[codec] ?? 'application/octet-stream' }),
   );
 };
 

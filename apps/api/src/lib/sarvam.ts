@@ -60,7 +60,7 @@ export const synthesize = async (text: string, options: SynthesizeOptions) => {
       : { temperature: options.temperature }),
   });
 
-  const audio = response.audios[0];
+  const audio = response.audios.join("");
   if (!audio) {
     throw createError(502, "Sarvam returned no audio for this chunk");
   }
