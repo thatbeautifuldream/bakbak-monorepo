@@ -11,10 +11,7 @@ export default defineConfig({
   manifest: {
     name: 'bakbak',
     description: 'Listen to any page. Narrated with Sarvam voices.',
-    // `cookies` + host access let the background worker reuse the session the
-    // user already has on the web app, so the extension needs no login of its own.
-    // Both origins are needed: the cookie is stored against the web app, and
-    // narration requests go to the API.
+    // The worker reuses the web app session; the extension has no separate login.
     permissions: ['cookies', 'storage', 'tabs'],
     host_permissions: ['http://localhost:3000/*', 'http://localhost:3001/*'],
   },

@@ -3,7 +3,7 @@
 import { queryOptions, type UseMutationOptions } from "@tanstack/react-query";
 
 import { client } from "../client.gen";
-import { getV1Me, type Options, patchV1Me, postV1TtsSpeak } from "../sdk.gen";
+import { getV1Me, type Options, patchV1Me } from "../sdk.gen";
 import type {
   GetV1MeData,
   GetV1MeError,
@@ -11,9 +11,6 @@ import type {
   PatchV1MeData,
   PatchV1MeError,
   PatchV1MeResponse,
-  PostV1TtsSpeakData,
-  PostV1TtsSpeakError,
-  PostV1TtsSpeakResponse,
 } from "../types.gen";
 
 export type QueryKey<TOptions extends Options> = [
@@ -102,33 +99,6 @@ export const patchV1MeMutation = (
   > = {
     mutationFn: async (fnOptions) => {
       const { data } = await patchV1Me({
-        ...options,
-        ...fnOptions,
-        throwOnError: true,
-      });
-      return data;
-    },
-  };
-  return mutationOptions;
-};
-
-/**
- * Speak text
- */
-export const postV1TtsSpeakMutation = (
-  options?: Partial<Options<PostV1TtsSpeakData>>,
-): UseMutationOptions<
-  PostV1TtsSpeakResponse,
-  PostV1TtsSpeakError,
-  Options<PostV1TtsSpeakData>
-> => {
-  const mutationOptions: UseMutationOptions<
-    PostV1TtsSpeakResponse,
-    PostV1TtsSpeakError,
-    Options<PostV1TtsSpeakData>
-  > = {
-    mutationFn: async (fnOptions) => {
-      const { data } = await postV1TtsSpeak({
         ...options,
         ...fnOptions,
         throwOnError: true,

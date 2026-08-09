@@ -12,9 +12,6 @@ import type {
   PatchV1MeData,
   PatchV1MeErrors,
   PatchV1MeResponses,
-  PostV1TtsSpeakData,
-  PostV1TtsSpeakErrors,
-  PostV1TtsSpeakResponses,
 } from "./types.gen";
 
 export type Options<
@@ -81,24 +78,5 @@ export const patchV1Me = <ThrowOnError extends boolean = false>(
     headers: {
       "Content-Type": "application/json",
       ...options?.headers,
-    },
-  });
-
-/**
- * Speak text
- */
-export const postV1TtsSpeak = <ThrowOnError extends boolean = false>(
-  options: Options<PostV1TtsSpeakData, ThrowOnError>,
-) =>
-  (options.client ?? client).post<
-    PostV1TtsSpeakResponses,
-    PostV1TtsSpeakErrors,
-    ThrowOnError
-  >({
-    url: "/v1/tts/speak",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
     },
   });

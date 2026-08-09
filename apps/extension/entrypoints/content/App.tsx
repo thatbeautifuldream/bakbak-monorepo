@@ -1,83 +1,110 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  CheckCircleIcon,
   ExclamationTriangleIcon,
-  PauseIcon,
-  PlayIcon,
-  SpeakerWaveIcon,
+  MicrophoneIcon,
+  SparklesIcon,
   StopIcon,
   XMarkIcon,
 } from '@heroicons/react/16/solid';
 import type { ContentScriptContext } from '#imports';
-import { extractArticle, selectedText } from '@/lib/article';
-import { usePlayer } from '@/lib/use-player';
 import { openLogin } from '@/lib/messages';
+import { executeWebsiteTool, VoiceClient } from '@/lib/voice-client';
+
+type VoiceState = 'idle' | 'connecting' | 'connected';
 
 function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState(() => document.title || 'Untitled page');
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [lastMessage, setLastMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const voiceRef = useRef<VoiceClient | undefined>(undefined);
 
-  const player = usePlayer();
-  const {
-    status,
-    chunks,
-    index,
-    error,
-    requiresLogin,
-    progress,
-    prepare,
-    reset,
-    play,
-  } = player;
-  const isBusy = status === 'preparing';
-
-  // `isolateEvents` stops key events at the shadow root, so Escape is handled
-  // on the panel itself — move focus there when it opens.
   useEffect(() => {
     if (isOpen) panelRef.current?.focus();
   }, [isOpen]);
 
-  // Client-side navigations don't re-run the content script; a new page means
-  // the prepared narration no longer matches what's on screen.
   useEffect(() => {
     ctx.addEventListener(window, 'wxt:locationchange', () => {
       setTitle(document.title || 'Untitled page');
-      reset();
+      setLastMessage('');
+      setError(null);
+      voiceRef.current?.stop();
+      voiceRef.current = undefined;
+      setVoiceState('idle');
     });
-  }, [ctx, reset]);
+  }, [ctx]);
+
+  useEffect(() => () => voiceRef.current?.stop(), []);
+
+  const stop = useCallback(() => {
+    voiceRef.current?.stop();
+    voiceRef.current = undefined;
+    setVoiceState('idle');
+  }, []);
 
   const start = useCallback(async () => {
-    const selection = selectedText();
-    const article = selection
-      ? { title: document.title, text: selection }
-      : extractArticle();
+    setError(null);
+    setLastMessage('Starting a private conversation…');
+    const client = new VoiceClient({
+      onState: (state) => {
+        if (state === 'connected') {
+          setVoiceState('connected');
+          setLastMessage('Listening. Ask me anything about this page.');
+        } else if (state === 'connecting') {
+          setVoiceState('connecting');
+        } else {
+          setVoiceState('idle');
+        }
+      },
+      onMessage: (message) => {
+        const toolName = message.name ?? message.tool_name;
+        if (message.type === 'server.event.tool_call' && toolName) {
+          void executeWebsiteTool(toolName, message.arguments ?? message.parameters).then(
+            (result) => client.sendToolResult(toolName, result),
+          );
+        }
+        if (message.content) setLastMessage(message.content);
+        if (message.text) setLastMessage(message.text);
+        if (message.type === 'error') {
+          setError(message.message ?? 'The conversation could not start.');
+        }
+      },
+    });
+    voiceRef.current = client;
+    try {
+      await client.start();
+    } catch (cause) {
+      client.stop();
+      voiceRef.current = undefined;
+      setVoiceState('idle');
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, []);
 
-    if (!article.text) return;
-
-    setTitle(article.title);
-    const next = await prepare(article.text);
-
-    if (next) play();
-  }, [prepare, play]);
-
-  const chunkCount = chunks.length;
+  const hostname = (() => {
+    try {
+      return new URL(location.href).hostname.replace(/^www\./, '');
+    } catch {
+      return 'this page';
+    }
+  })();
 
   if (!isOpen) {
     return (
       <div className="root">
-        <button
-          type="button"
-          className="launcher"
-          onClick={() => setIsOpen(true)}
-          aria-label="Open bakbak"
-        >
-          <SpeakerWaveIcon className="icon" aria-hidden="true" />
+        <button className="launcher" type="button" onClick={() => setIsOpen(true)} aria-label="Open bakbak voice companion">
+          <span className="launcher-orb" aria-hidden="true"><SparklesIcon className="icon" /></span>
+          <span className="launcher-label">bakbak</span>
         </button>
       </div>
     );
   }
+
+  const isLive = voiceState === 'connected';
 
   return (
     <div className="root">
@@ -85,130 +112,68 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         ref={panelRef}
         tabIndex={-1}
         className="panel"
-        aria-label="bakbak narration player"
+        aria-label="bakbak voice companion"
         onKeyDown={(event) => event.key === 'Escape' && setIsOpen(false)}
       >
         <header className="panel-header">
-          <div className="panel-heading">
-            <h2 className="panel-title">bakbak</h2>
-            <p className="panel-subtitle" title={title}>
-              {title}
-            </p>
+          <div>
+            <p className="eyebrow"><span className="eyebrow-mark" />PAGE COMPANION</p>
+            <h2 className="panel-title">Talk it through.</h2>
           </div>
-          <button
-            type="button"
-            className="button-ghost"
-            onClick={() => setIsOpen(false)}
-            aria-label="Close panel"
-          >
+          <button className="button-icon" type="button" onClick={() => setIsOpen(false)} aria-label="Close bakbak">
             <XMarkIcon className="icon" aria-hidden="true" />
           </button>
         </header>
 
         <div className="panel-body">
+          <div className="page-context">
+            <span className="context-icon"><CheckCircleIcon className="icon" aria-hidden="true" /></span>
+            <div className="context-copy">
+              <p className="context-label">You are on</p>
+              <p className="context-title" title={title}>{title}</p>
+            </div>
+            <span className="context-host">{hostname}</span>
+          </div>
+
           {error ? (
             <div className="notice" role="alert">
               <ExclamationTriangleIcon className="icon" aria-hidden="true" />
-              <span className="notice-message">{error}</span>
-              {requiresLogin ? (
-                <button
-                  type="button"
-                  className="notice-login"
-                  onClick={() => void openLogin()}
-                >
-                  Login
-                  <ArrowTopRightOnSquareIcon className="icon" aria-hidden="true" />
+              <p>{error}</p>
+              {error.toLowerCase().includes('sign in') ? (
+                <button className="notice-login" type="button" onClick={() => void openLogin()}>
+                  Login <ArrowTopRightOnSquareIcon className="icon" aria-hidden="true" />
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {chunkCount > 0 ? (
-            <div className="progress">
-              <div
-                className="progress-track"
-                role="progressbar"
-                aria-valuenow={progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Narration progress"
-              >
-                <div
-                  className="progress-fill"
-                  style={{ inlineSize: `${progress}%` }}
-                />
-              </div>
-              <p className="progress-label">
-                Part {Math.min(index + 1, chunkCount)} of {chunkCount}
-              </p>
+          <div className={`conversation-stage ${isLive ? 'conversation-stage-live' : ''}`}>
+            <div className="orb-wrap" aria-hidden="true">
+              <span className="orb-halo" />
+              <span className="orb"><MicrophoneIcon className="orb-icon" /></span>
             </div>
-          ) : null}
+            <p className="stage-status">
+              {voiceState === 'connecting' ? 'Connecting securely' : isLive ? 'Conversation live' : 'Ready when you are'}
+            </p>
+            <p className="stage-message">{lastMessage || 'Ask about the page, find a detail, or get a quick explanation.'}</p>
+            {isLive ? (
+              <div className="signal-bars" aria-label="Microphone active">
+                {Array.from({ length: 11 }, (_, index) => <span key={index} style={{ '--bar-delay': `${index * 70}ms` } as CSSProperties} />)}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <footer className="panel-footer">
-          {status === 'playing' || status === 'paused' ? (
-            <button
-              type="button"
-              className="button-ghost"
-              onClick={player.stop}
-              aria-label="Stop narration"
-            >
-              <StopIcon className="icon" aria-hidden="true" />
-            </button>
-          ) : null}
-
-          <p className="footer-note">
-            {status === 'preparing'
-              ? 'Preparing narration…'
-              : status === 'playing'
-                ? 'Playing'
-                : status === 'paused'
-                  ? 'Paused'
-                  : chunks.length
-                    ? 'Ready'
-                    : 'Press Escape to close.'}
-          </p>
-
-          {status === 'playing' ? (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={player.pause}
-            >
-              <PauseIcon className="icon" aria-hidden="true" />
-              Pause
-            </button>
-          ) : status === 'paused' ? (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={player.resume}
-            >
-              <PlayIcon className="icon" aria-hidden="true" />
-              Resume
-            </button>
-          ) : chunks.length ? (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={player.play}
-            >
-              <PlayIcon className="icon" aria-hidden="true" />
-              Play
+          <p className="privacy-note">Mic starts only after you ask. Audio is relayed securely.</p>
+          {isLive ? (
+            <button className="button-stop" type="button" onClick={stop}>
+              <StopIcon className="icon" aria-hidden="true" /> Stop
             </button>
           ) : (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={start}
-              disabled={isBusy}
-            >
-              {isBusy ? (
-                <ArrowPathIcon className="icon icon-spin" aria-hidden="true" />
-              ) : (
-                <PlayIcon className="icon" aria-hidden="true" />
-              )}
-              {isBusy ? 'Preparing' : 'Listen'}
+            <button className="button-primary" type="button" onClick={() => void start()} disabled={voiceState === 'connecting'}>
+              <MicrophoneIcon className="icon" aria-hidden="true" />
+              {voiceState === 'connecting' ? 'Connecting' : 'Start talking'}
             </button>
           )}
         </footer>

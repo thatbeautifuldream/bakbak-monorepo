@@ -1,27 +1,15 @@
-import { ApiError } from './api';
-import type { SpeakRequest, Speech } from './api';
-
 export type Request =
-  | { type: 'speak'; body: SpeakRequest }
   | { type: 'open-login' };
 
-export type Response<T> =
-  | { ok: true; data: T }
+export type Response =
+  | { ok: true; data: void }
   | { ok: false; error: string; status: number };
 
-type ResultFor<R extends Request> = R extends { type: 'speak' } ? Speech : void;
-
-/** Content scripts run in the page's origin, so all API calls go via the worker. */
-export async function send<R extends Request>(
-  request: R,
-): Promise<ResultFor<R>> {
-  const response: Response<ResultFor<R>> =
-    await browser.runtime.sendMessage(request);
+export async function send(request: Request): Promise<void> {
+  const response: Response = await browser.runtime.sendMessage(request);
 
   if (!response) throw new Error('Extension worker did not respond');
-  if (!response.ok) throw new ApiError(response.error, response.status);
-
-  return response.data as ResultFor<R>;
+  if (!response.ok) throw new Error(response.error);
 }
 
 export const openLogin = () => send({ type: 'open-login' });

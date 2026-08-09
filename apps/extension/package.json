@@ -19,6 +19,7 @@
     "@heroicons/react": "^2.2.0",
     "@mozilla/readability": "^0.6.0",
     "@repo/api-client": "workspace:*",
+    "sarvam-conv-ai-sdk": "^0.0.42",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

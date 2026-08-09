@@ -1,4 +1,4 @@
-/** Where the API lives — narration requests go here. */
+/** Where the conversational agent API lives. */
 export const API_URL = import.meta.env.WXT_API_URL ?? 'http://localhost:3000';
 
 /**

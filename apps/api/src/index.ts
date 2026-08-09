@@ -7,6 +7,7 @@ import { toNodeHandler } from "better-auth/node";
 import { routing } from "./routing.js";
 import { auth } from "./auth.js";
 import { mkdirSync, writeFileSync } from "fs";
+import { attachVoiceWebSocket } from "./lib/voice.js";
 
 const appName = process.env.APP_NAME ?? "MyApp";
 
@@ -54,7 +55,6 @@ const config = {
       composition: "inline",
       tags: {
         users: { description: "User account management" },
-        tts: { description: "Narration and text-to-speech via Sarvam" },
       },
     });
 
@@ -74,6 +74,9 @@ const config = {
   },
 };
 
-const { logger } = await createServer(config, routing);
+const { logger, servers } = await createServer(config, routing);
+
+const httpServer = servers[0];
+if (httpServer) attachVoiceWebSocket(httpServer);
 
 logger.info(`${appName} API running on http://localhost:3000`);
