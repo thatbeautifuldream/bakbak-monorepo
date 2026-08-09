@@ -181,7 +181,6 @@ export class VoiceClient {
   private socket?: WebSocket;
   private audio = new BrowserAudioInterface(16000);
   private isReady = false;
-  private playbackEndsAt = 0;
 
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
@@ -199,13 +198,9 @@ export class VoiceClient {
         this.callbacks.onState('connected');
       }
       if (message.audio_base64) {
-        const audio = decode(message.audio_base64);
-        const sampleRate = message.sample_rate ?? 16000;
-        const durationMs = (audio.byteLength / 2 / sampleRate) * 1000;
-        this.playbackEndsAt = Math.max(this.playbackEndsAt, performance.now()) + durationMs;
         void this.audio.output(
-          audio,
-          sampleRate,
+          decode(message.audio_base64),
+          message.sample_rate ?? 16000,
         );
       }
       this.callbacks.onMessage(message);
@@ -214,8 +209,7 @@ export class VoiceClient {
     this.socket.addEventListener('error', () => this.callbacks.onState('closed'));
 
     await this.audio.start(async (audio) => {
-      const agentAudioIsPlaying = performance.now() < this.playbackEndsAt + 300;
-      if (this.socket?.readyState === WebSocket.OPEN && this.isReady && !agentAudioIsPlaying) {
+      if (this.socket?.readyState === WebSocket.OPEN && this.isReady) {
         this.socket.send(JSON.stringify({ type: 'audio', audio: encode(audio) }));
       }
     });
@@ -223,7 +217,6 @@ export class VoiceClient {
 
   stop() {
     this.isReady = false;
-    this.playbackEndsAt = 0;
     void this.audio.stop();
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ type: 'stop' }));
