@@ -1,9 +1,7 @@
 import { ApiError } from './api';
-import type { Plan, PlanRequest, SpeakRequest, Speech, Voices } from './api';
+import type { SpeakRequest, Speech } from './api';
 
 export type Request =
-  | { type: 'voices' }
-  | { type: 'plan'; body: PlanRequest }
   | { type: 'speak'; body: SpeakRequest }
   | { type: 'open-login' };
 
@@ -11,13 +9,7 @@ export type Response<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; status: number };
 
-type ResultFor<R extends Request> = R extends { type: 'voices' }
-  ? Voices
-  : R extends { type: 'plan' }
-    ? Plan
-    : R extends { type: 'speak' }
-      ? Speech
-      : void;
+type ResultFor<R extends Request> = R extends { type: 'speak' } ? Speech : void;
 
 /** Content scripts run in the page's origin, so all API calls go via the worker. */
 export async function send<R extends Request>(

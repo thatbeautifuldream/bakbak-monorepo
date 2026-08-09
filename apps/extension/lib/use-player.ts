@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from './api';
-import type { Plan, PlanRequest, SpeakRequest } from './api';
+import { splitText } from './chunk';
 import { send } from './messages';
 
 export type PlayerStatus =
@@ -11,49 +11,44 @@ export type PlayerStatus =
   | 'paused'
   | 'error';
 
-export interface VoiceSettings {
-  speaker: SpeakRequest['speaker'];
-  targetLanguageCode?: PlanRequest['targetLanguageCode'];
-  contentType: NonNullable<PlanRequest['contentType']>;
-  rate: number;
-}
-
-const MIME_TYPES: Record<string, string> = {
-  mp3: 'audio/mpeg',
-  wav: 'audio/wav',
-  opus: 'audio/ogg; codecs=opus',
-  flac: 'audio/flac',
-  aac: 'audio/aac',
-  linear16: 'audio/wav',
-  mulaw: 'audio/basic',
-  alaw: 'audio/basic',
-};
-
-const toBlobUrl = (base64: string, codec: string) => {
+const toAudioUrl = (encoded: string) => {
+  const base64 = encoded.replace(/^data:[^,]+,/, '');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return URL.createObjectURL(
-    new Blob([bytes], { type: MIME_TYPES[codec] ?? 'application/octet-stream' }),
-  );
+
+  const type =
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x41 &&
+    bytes[10] === 0x56 &&
+    bytes[11] === 0x45
+      ? 'audio/wav'
+      : (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
+          (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0)
+        ? 'audio/mpeg'
+        : bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53
+          ? 'audio/ogg'
+          : bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43
+            ? 'audio/flac'
+            : null;
+
+  if (!type) throw new Error('TTS returned an unsupported audio format');
+  return `data:${type};base64,${base64}`;
 };
 
-export function usePlayer(settings: VoiceSettings) {
+export function usePlayer() {
   const [status, setStatus] = useState<PlayerStatus>('idle');
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [chunks, setChunks] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [requiresLogin, setRequiresLogin] = useState(false);
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cacheRef = useRef(new Map<number, Promise<string>>());
-  const planRef = useRef<Plan | null>(null);
-  // Read inside async callbacks and the once-bound `ended` listener, so they
-  // always see current values rather than the render they were created in.
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-  // The ref leads and state follows: chunk transitions happen faster than
-  // React re-renders, so callers must never read a stale index.
+  const chunksRef = useRef<string[]>([]);
   const indexRef = useRef(index);
 
   const moveTo = useCallback((next: number) => {
@@ -66,9 +61,6 @@ export function usePlayer(settings: VoiceSettings) {
   }
 
   const releaseCache = useCallback(() => {
-    for (const pending of cacheRef.current.values()) {
-      pending.then(URL.revokeObjectURL).catch(() => {});
-    }
     cacheRef.current.clear();
   }, []);
 
@@ -80,14 +72,9 @@ export function usePlayer(settings: VoiceSettings) {
     };
   }, [releaseCache]);
 
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.playbackRate = settings.rate;
-  }, [settings.rate]);
-
   const audioFor = useCallback((chunkIndex: number) => {
-    const current = planRef.current;
-    const chunk = current?.chunks[chunkIndex];
-    if (!current || !chunk) return null;
+    const text = chunksRef.current[chunkIndex];
+    if (!text) return null;
 
     const cached = cacheRef.current.get(chunkIndex);
     if (cached) return cached;
@@ -95,13 +82,10 @@ export function usePlayer(settings: VoiceSettings) {
     const pending = send({
       type: 'speak',
       body: {
-        text: chunk.text,
-        languageCode: current.languageCode,
-        speaker: settingsRef.current.speaker,
+        text,
       },
-    }).then((speech) => toBlobUrl(speech.audio, speech.codec));
+    }).then((speech) => toAudioUrl(speech.audio));
 
-    // Don't cache a rejection — a retry should be able to re-request.
     pending.catch(() => cacheRef.current.delete(chunkIndex));
     cacheRef.current.set(chunkIndex, pending);
     return pending;
@@ -110,10 +94,9 @@ export function usePlayer(settings: VoiceSettings) {
   const playIndex = useCallback(
     async (chunkIndex: number) => {
       const audio = audioRef.current;
-      const current = planRef.current;
-      if (!audio || !current) return;
+      if (!audio || !chunksRef.current.length) return;
 
-      if (chunkIndex >= current.chunks.length) {
+      if (chunkIndex >= chunksRef.current.length) {
         setStatus('ready');
         moveTo(0);
         return;
@@ -125,15 +108,10 @@ export function usePlayer(settings: VoiceSettings) {
       try {
         const url = await audioFor(chunkIndex);
         if (!url) return;
-
         audio.src = url;
-        audio.playbackRate = settingsRef.current.rate;
         await audio.play();
-
-        // Warm the next chunk so playback continues without a gap.
         void audioFor(chunkIndex + 1);
       } catch (cause) {
-        // A pause() during an in-flight play() rejects; that isn't an error.
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
         const needsLogin = cause instanceof ApiError && cause.status === 401;
         setRequiresLogin(needsLogin);
@@ -147,47 +125,38 @@ export function usePlayer(settings: VoiceSettings) {
         setStatus('error');
       }
     },
-    [audioFor],
+    [audioFor, moveTo],
   );
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     const onEnded = () => void playIndex(indexRef.current + 1);
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
   }, [playIndex]);
 
   const prepare = useCallback(
-    async (body: PlanRequest) => {
+    async (text: string) => {
       setStatus('preparing');
       setError(null);
       setRequiresLogin(false);
       releaseCache();
       moveTo(0);
 
-      try {
-        const next = await send({ type: 'plan', body });
-        planRef.current = next;
-        setPlan(next);
-        setStatus('ready');
-        return next;
-      } catch (cause) {
-        const needsLogin = cause instanceof ApiError && cause.status === 401;
-        setRequiresLogin(needsLogin);
-        setError(
-          needsLogin
-            ? 'Sign in to listen to this page.'
-            : cause instanceof Error
-              ? cause.message
-              : String(cause),
-        );
+      const next = splitText(text);
+      if (!next.length) {
+        setError('No text found on this page');
         setStatus('error');
-        return null;
+        return false;
       }
+
+      chunksRef.current = next;
+      setChunks(next);
+      setStatus('ready');
+      return true;
     },
-    [releaseCache, moveTo],
+    [moveTo, releaseCache],
   );
 
   const play = useCallback(() => void playIndex(indexRef.current), [playIndex]);
@@ -208,44 +177,31 @@ export function usePlayer(settings: VoiceSettings) {
     }
   }, [playIndex]);
 
-  const seek = useCallback(
-    (chunkIndex: number) => {
-      audioRef.current?.pause();
-      void playIndex(chunkIndex);
-    },
-    [playIndex],
-  );
-
   const stop = useCallback(() => {
     audioRef.current?.pause();
     moveTo(0);
-    setStatus(planRef.current ? 'ready' : 'idle');
+    setStatus(chunksRef.current.length ? 'ready' : 'idle');
   }, [moveTo]);
 
   const reset = useCallback(() => {
     audioRef.current?.pause();
     releaseCache();
-    planRef.current = null;
-    setPlan(null);
+    chunksRef.current = [];
+    setChunks([]);
     moveTo(0);
     setStatus('idle');
     setError(null);
     setRequiresLogin(false);
   }, [releaseCache, moveTo]);
 
-  // A different voice invalidates every rendered chunk.
-  useEffect(() => {
-    releaseCache();
-  }, [settings.speaker, releaseCache]);
-
-  const progress = useMemo(() => {
-    if (!plan?.chunks.length) return 0;
-    return Math.round((index / plan.chunks.length) * 100);
-  }, [plan, index]);
+  const progress = useMemo(
+    () => (chunks.length ? Math.round((index / chunks.length) * 100) : 0),
+    [chunks.length, index],
+  );
 
   return {
     status,
-    plan,
+    chunks,
     index,
     error,
     requiresLogin,
@@ -254,7 +210,6 @@ export function usePlayer(settings: VoiceSettings) {
     play,
     pause,
     resume,
-    seek,
     stop,
     reset,
   };

@@ -6,21 +6,12 @@ import type {
   GetV1MeData,
   GetV1MeErrors,
   GetV1MeResponses,
-  GetV1TtsVoicesData,
-  GetV1TtsVoicesErrors,
-  GetV1TtsVoicesResponses,
   HeadV1MeData,
   HeadV1MeErrors,
   HeadV1MeResponses,
-  HeadV1TtsVoicesData,
-  HeadV1TtsVoicesErrors,
-  HeadV1TtsVoicesResponses,
   PatchV1MeData,
   PatchV1MeErrors,
   PatchV1MeResponses,
-  PostV1TtsPlanData,
-  PostV1TtsPlanErrors,
-  PostV1TtsPlanResponses,
   PostV1TtsSpeakData,
   PostV1TtsSpeakErrors,
   PostV1TtsSpeakResponses,
@@ -94,58 +85,7 @@ export const patchV1Me = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * List voices and narration options
- *
- * Returns the Bulbul models, their compatible voices, supported languages, narration tones, codecs and sample rates. Use this to populate voice pickers instead of hardcoding values.
- */
-export const getV1TtsVoices = <ThrowOnError extends boolean = false>(
-  options?: Options<GetV1TtsVoicesData, ThrowOnError>,
-) =>
-  (options?.client ?? client).get<
-    GetV1TtsVoicesResponses,
-    GetV1TtsVoicesErrors,
-    ThrowOnError
-  >({ url: "/v1/tts/voices", ...options });
-
-/**
- * List voices and narration options
- *
- * Returns the Bulbul models, their compatible voices, supported languages, narration tones, codecs and sample rates. Use this to populate voice pickers instead of hardcoding values.
- */
-export const headV1TtsVoices = <ThrowOnError extends boolean = false>(
-  options?: Options<HeadV1TtsVoicesData, ThrowOnError>,
-) =>
-  (options?.client ?? client).head<
-    HeadV1TtsVoicesResponses,
-    HeadV1TtsVoicesErrors,
-    ThrowOnError
-  >({ url: "/v1/tts/voices", ...options });
-
-/**
- * Build a narration script
- *
- * Turns raw page text into an ordered list of narration-ready chunks: optional LLM clean-up, optional translation, then splitting at sentence boundaries within the TTS character limit. Returns no audio — call /v1/tts/speak per chunk and prefetch ahead of playback.
- */
-export const postV1TtsPlan = <ThrowOnError extends boolean = false>(
-  options: Options<PostV1TtsPlanData, ThrowOnError>,
-) =>
-  (options.client ?? client).post<
-    PostV1TtsPlanResponses,
-    PostV1TtsPlanErrors,
-    ThrowOnError
-  >({
-    url: "/v1/tts/plan",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-/**
- * Synthesize one chunk
- *
- * Converts a single narration chunk into base64-encoded audio using Sarvam Bulbul. Text must be within the TTS character limit — use /v1/tts/plan to split longer content.
+ * Speak text
  */
 export const postV1TtsSpeak = <ThrowOnError extends boolean = false>(
   options: Options<PostV1TtsSpeakData, ThrowOnError>,

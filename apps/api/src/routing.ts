@@ -1,10 +1,6 @@
 import type { Routing } from "express-zod-api";
 import { getMeEndpoint, updateProfileEndpoint } from "./endpoints/user.js";
-import {
-  getVoicesEndpoint,
-  planNarrationEndpoint,
-  speakEndpoint,
-} from "./endpoints/tts.js";
+import { speakEndpoint } from "./endpoints/tts.js";
 
 export const routing: Routing = {
   v1: {
@@ -13,8 +9,6 @@ export const routing: Routing = {
       patch: updateProfileEndpoint,
     },
     tts: {
-      voices: { get: getVoicesEndpoint },
-      plan: { post: planNarrationEndpoint },
       speak: { post: speakEndpoint },
     },
   },

@@ -1,13 +1,9 @@
-import { ApiError, fetchVoices, planNarration, speakChunk } from '@/lib/api';
+import { ApiError, speakChunk } from '@/lib/api';
 import { WEB_URL } from '@/lib/config';
 import type { Request, Response } from '@/lib/messages';
 
 async function handle(request: Request) {
   switch (request.type) {
-    case 'voices':
-      return fetchVoices();
-    case 'plan':
-      return planNarration(request.body);
     case 'speak':
       return speakChunk(request.body);
     case 'open-login':

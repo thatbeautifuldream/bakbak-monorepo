@@ -1,17 +1,11 @@
 import type {
-  GetV1TtsVoicesResponses,
-  PostV1TtsPlanData,
-  PostV1TtsPlanResponses,
   PostV1TtsSpeakData,
   PostV1TtsSpeakResponses,
 } from '@repo/api-client/types';
 import { API_URL, SESSION_COOKIE, WEB_URL } from './config';
 
-export type PlanRequest = PostV1TtsPlanData['body'];
-export type Plan = PostV1TtsPlanResponses[200]['data'];
 export type SpeakRequest = PostV1TtsSpeakData['body'];
 export type Speech = PostV1TtsSpeakResponses[200]['data'];
-export type Voices = GetV1TtsVoicesResponses[200]['data'];
 
 export class ApiError extends Error {
   constructor(
@@ -67,11 +61,6 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
 
   return (payload as { data: T }).data;
 }
-
-export const fetchVoices = () => request<Voices>('/v1/tts/voices');
-
-export const planNarration = (body: PlanRequest) =>
-  request<Plan>('/v1/tts/plan', body);
 
 export const speakChunk = (body: SpeakRequest) =>
   request<Speech>('/v1/tts/speak', body);

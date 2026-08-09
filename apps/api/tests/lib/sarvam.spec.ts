@@ -27,7 +27,7 @@ describe("synthesize", () => {
         languageCode: "en-IN",
         speaker: "shubh",
         model: "bulbul:v3",
-        codec: "mp3",
+        codec: "wav",
       }),
     ).resolves.toEqual({ audio: "QUJD", requestId: "req-1" });
   });

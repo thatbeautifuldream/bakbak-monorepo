@@ -11,36 +11,18 @@ import {
 } from '@heroicons/react/16/solid';
 import type { ContentScriptContext } from '#imports';
 import { extractArticle, selectedText } from '@/lib/article';
-import { usePlayer, type VoiceSettings } from '@/lib/use-player';
-import { openLogin, send } from '@/lib/messages';
-import type { Voices } from '@/lib/api';
-
-const CONTENT_TYPES = [
-  { value: 'general', label: 'General' },
-  { value: 'news', label: 'News' },
-  { value: 'fiction', label: 'Fiction' },
-  { value: 'education', label: 'Education' },
-] as const;
-
-const RATES = [0.75, 1, 1.25, 1.5, 2] as const;
-
-const DEFAULT_SETTINGS: VoiceSettings = {
-  speaker: 'shubh',
-  contentType: 'general',
-  rate: 1,
-};
+import { usePlayer } from '@/lib/use-player';
+import { openLogin } from '@/lib/messages';
 
 function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [settings, setSettings] = useState<VoiceSettings>(DEFAULT_SETTINGS);
-  const [voices, setVoices] = useState<Voices | null>(null);
   const [title, setTitle] = useState(() => document.title || 'Untitled page');
   const panelRef = useRef<HTMLElement>(null);
 
-  const player = usePlayer(settings);
+  const player = usePlayer();
   const {
     status,
-    plan,
+    chunks,
     index,
     error,
     requiresLogin,
@@ -66,13 +48,6 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     });
   }, [ctx, reset]);
 
-  useEffect(() => {
-    if (!isOpen || voices) return;
-    send({ type: 'voices' })
-      .then(setVoices)
-      .catch(() => {});
-  }, [isOpen, voices]);
-
   const start = useCallback(async () => {
     const selection = selectedText();
     const article = selection
@@ -82,18 +57,12 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     if (!article.text) return;
 
     setTitle(article.title);
-    const next = await prepare({
-      text: article.text,
-      title: article.title,
-      contentType: settings.contentType,
-      targetLanguageCode: settings.targetLanguageCode,
-    });
+    const next = await prepare(article.text);
 
     if (next) play();
-  }, [prepare, play, settings.contentType, settings.targetLanguageCode]);
+  }, [prepare, play]);
 
-  const speakers = voices?.models.find((m) => m.id === 'bulbul:v3')?.speakers;
-  const chunkCount = plan?.chunks.length ?? 0;
+  const chunkCount = chunks.length;
 
   if (!isOpen) {
     return (
@@ -154,136 +123,6 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             </div>
           ) : null}
 
-          <div className="field">
-            <label className="field-label" htmlFor="bak-voice">
-              Voice
-            </label>
-            <div className="select-wrap">
-              <select
-                id="bak-voice"
-                name="voice"
-                className="select"
-                value={settings.speaker}
-                onChange={(event) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    speaker: event.target.value as VoiceSettings['speaker'],
-                  }))
-                }
-              >
-                {(speakers ?? [settings.speaker]).map((speaker) => (
-                  <option key={speaker} value={speaker}>
-                    {speaker}
-                  </option>
-                ))}
-              </select>
-              <svg
-                viewBox="0 0 8 5"
-                width="8"
-                height="5"
-                fill="none"
-                className="select-chevron"
-                aria-hidden="true"
-              >
-                <path d="M.5.5 4 4 7.5.5" stroke="currentcolor" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="field">
-            <label className="field-label" htmlFor="bak-language">
-              Narrate in
-            </label>
-            <div className="select-wrap">
-              <select
-                id="bak-language"
-                name="language"
-                className="select"
-                value={settings.targetLanguageCode ?? ''}
-                onChange={(event) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    targetLanguageCode: (event.target.value ||
-                      undefined) as VoiceSettings['targetLanguageCode'],
-                  }))
-                }
-              >
-                <option value="">Original language</option>
-                {(voices?.languages ?? []).map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
-              <svg
-                viewBox="0 0 8 5"
-                width="8"
-                height="5"
-                fill="none"
-                className="select-chevron"
-                aria-hidden="true"
-              >
-                <path d="M.5.5 4 4 7.5.5" stroke="currentcolor" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="field">
-            <label className="field-label" htmlFor="bak-tone">
-              Tone
-            </label>
-            <div className="select-wrap">
-              <select
-                id="bak-tone"
-                name="tone"
-                className="select"
-                value={settings.contentType}
-                onChange={(event) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    contentType: event.target
-                      .value as VoiceSettings['contentType'],
-                  }))
-                }
-              >
-                {CONTENT_TYPES.map((tone) => (
-                  <option key={tone.value} value={tone.value}>
-                    {tone.label}
-                  </option>
-                ))}
-              </select>
-              <svg
-                viewBox="0 0 8 5"
-                width="8"
-                height="5"
-                fill="none"
-                className="select-chevron"
-                aria-hidden="true"
-              >
-                <path d="M.5.5 4 4 7.5.5" stroke="currentcolor" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="field">
-            <span className="field-label" id="bak-speed-label">
-              Speed
-            </span>
-            <div className="rates" role="group" aria-labelledby="bak-speed-label">
-              {RATES.map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  className="rate"
-                  aria-pressed={settings.rate === rate}
-                  onClick={() => setSettings((prev) => ({ ...prev, rate }))}
-                >
-                  {rate}×
-                </button>
-              ))}
-            </div>
-          </div>
-
           {chunkCount > 0 ? (
             <div className="progress">
               <div
@@ -301,7 +140,6 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               </div>
               <p className="progress-label">
                 Part {Math.min(index + 1, chunkCount)} of {chunkCount}
-                {plan?.translated ? ` · ${plan.languageCode}` : null}
               </p>
             </div>
           ) : null}
@@ -326,7 +164,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
                 ? 'Playing'
                 : status === 'paused'
                   ? 'Paused'
-                  : plan
+                  : chunks.length
                     ? 'Ready'
                     : 'Press Escape to close.'}
           </p>
@@ -349,7 +187,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               <PlayIcon className="icon" aria-hidden="true" />
               Resume
             </button>
-          ) : plan ? (
+          ) : chunks.length ? (
             <button
               type="button"
               className="button-primary"
