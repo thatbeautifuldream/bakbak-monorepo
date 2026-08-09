@@ -70,17 +70,15 @@ export default function DashboardPage() {
 
             <ol
               role="list"
-              className="mt-5 grid gap-x-8 gap-y-5 border-t border-border pt-5 sm:grid-cols-3"
+              className="mt-5 flex flex-col gap-2 border-t border-border pt-5"
             >
               {INSTALL_STEPS.map((step, index) => (
-                <li key={step.label}>
-                  <p className="font-mono text-[0.6875rem] text-muted-foreground">
-                    Step {index + 1}
-                  </p>
-                  <h3 className="mt-1 text-sm font-medium">{step.label}</h3>
-                  <p className="mt-1 max-w-[40ch] text-sm/6 text-pretty text-muted-foreground">
-                    {step.detail}
-                  </p>
+                <li
+                  key={step}
+                  className="flex gap-2.5 text-base/7 text-pretty text-muted-foreground sm:text-sm/6"
+                >
+                  <span className="font-mono tabular-nums">{index + 1}</span>
+                  {step}
                 </li>
               ))}
             </ol>
