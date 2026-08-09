@@ -67,9 +67,12 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
     return;
   }
 
-  const apiKey = process.env.SARVAM_API_KEY;
+  const apiKey = process.env.SARVAM_CONVERSATIONS_API_KEY?.trim();
   if (!apiKey) {
-    socket.close(1011, "SARVAM_API_KEY is not configured");
+    socket.close(
+      1011,
+      "SARVAM_CONVERSATIONS_API_KEY is not configured; create it in Sarvam Conversations Settings > API Key",
+    );
     return;
   }
 
