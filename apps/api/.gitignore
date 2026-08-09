@@ -3,4 +3,3 @@ dist/
 docs/
 .env
 .env*.local
-drizzle/meta/
