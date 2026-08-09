@@ -111,6 +111,31 @@ export async function executeWebsiteTool(
   args: Record<string, unknown> = {},
 ) {
   switch (name) {
+    case 'browser_action': {
+      const action = typeof args.action === 'string' ? args.action : '';
+      if (action === 'scroll_up' || action === 'scroll_down') {
+        const direction = action === 'scroll_up' ? -1 : 1;
+        window.scrollBy({ top: direction * window.innerHeight * 0.8, behavior: 'smooth' });
+        return { ok: true, action };
+      }
+      if (action === 'go_back') {
+        history.back();
+        return { ok: true, action };
+      }
+      if (action === 'click') {
+        const elementId = typeof args.element_id === 'string' ? args.element_id : '';
+        const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
+        if (!(element instanceof HTMLElement)) {
+          return { error: 'Element not found. Ask the user to restate the target.' };
+        }
+        if (element.matches('button[type="submit"], input[type="submit"]')) {
+          return { error: 'Submitting forms by voice is not enabled.' };
+        }
+        element.click();
+        return { ok: true, action, element_id: elementId };
+      }
+      return { error: `Unsupported browser action: ${action}` };
+    }
     case 'get_page_context':
       return {
         title: document.title,
@@ -150,6 +175,17 @@ export async function executeWebsiteTool(
       window.scrollBy({ top: direction * window.innerHeight * 0.8, behavior: 'smooth' });
       return { ok: true, direction: direction < 0 ? 'up' : 'down' };
     }
+    case 'navigate_to_page': {
+      const url = typeof args.url === 'string' ? new URL(args.url, location.href) : undefined;
+      if (!url || !['http:', 'https:'].includes(url.protocol)) {
+        return { error: 'Only HTTP and HTTPS pages can be opened.' };
+      }
+      location.assign(url.href);
+      return { ok: true, url: url.href };
+    }
+    case 'go_back':
+      history.back();
+      return { ok: true };
     default:
       return { error: `Website tool ${name} is not enabled`, args };
   }
