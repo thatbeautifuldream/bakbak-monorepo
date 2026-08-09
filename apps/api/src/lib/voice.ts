@@ -83,6 +83,11 @@ const send = (socket: WebSocket, message: unknown) => {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 };
 
+const endInteraction = (socket: WebSocket) => {
+  send(socket, { type: "server.action.interaction_end" });
+  socket.close(1000, "Voice agent ended the conversation");
+};
+
 const authenticate = async (request: IncomingMessage) => {
   const token = getSessionToken(request);
   if (!token) return false;
@@ -123,6 +128,7 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
       textCallback: async (message) => send(socket, message),
       transcriptCallback: async (message) => send(socket, message),
       eventCallback: async (event) => send(socket, event),
+      endCallback: async () => endInteraction(socket),
     });
 
     await agent.start();

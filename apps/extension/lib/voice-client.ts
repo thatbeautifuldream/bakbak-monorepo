@@ -94,6 +94,8 @@ const socketUrl = (token: string) => {
   return { url: url.toString(), token };
 };
 
+const interactionEndType = 'server.action.interaction_end';
+
 async function getSessionToken() {
   return send({ type: 'session-token' });
 }
@@ -101,6 +103,7 @@ async function getSessionToken() {
 export type VoiceClientCallbacks = {
   onMessage: (message: VoiceMessage) => void;
   onState: (state: 'connecting' | 'connected' | 'closed') => void;
+  onError?: (message: string) => void;
 };
 
 export async function executeWebsiteTool(
@@ -181,11 +184,13 @@ export class VoiceClient {
   private socket?: WebSocket;
   private audio = new BrowserAudioInterface(16000);
   private isReady = false;
+  private isClosed = false;
 
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
   async start(context: WebsiteContext) {
     const { url, token } = socketUrl(await getSessionToken());
+    this.isClosed = false;
     this.callbacks.onState('connecting');
     this.socket = new WebSocket(url, ['bearer', token]);
     this.socket.addEventListener('message', (event) => {
@@ -197,6 +202,9 @@ export class VoiceClient {
         this.isReady = true;
         this.callbacks.onState('connected');
       }
+      if (message.type === interactionEndType) {
+        this.finish();
+      }
       if (message.audio_base64) {
         void this.audio.output(
           decode(message.audio_base64),
@@ -205,8 +213,11 @@ export class VoiceClient {
       }
       this.callbacks.onMessage(message);
     });
-    this.socket.addEventListener('close', () => this.callbacks.onState('closed'));
-    this.socket.addEventListener('error', () => this.callbacks.onState('closed'));
+    this.socket.addEventListener('close', () => this.finish());
+    this.socket.addEventListener('error', () => {
+      this.callbacks.onError?.('WebSocket connection error.');
+      this.finish();
+    });
 
     await this.audio.start(async (audio) => {
       if (this.socket?.readyState === WebSocket.OPEN && this.isReady) {
@@ -216,18 +227,26 @@ export class VoiceClient {
   }
 
   stop() {
-    this.isReady = false;
-    void this.audio.stop();
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: 'stop' }));
+    const socket = this.socket;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'stop' }));
     }
-    this.socket?.close();
-    this.socket = undefined;
+    this.finish();
+    socket?.close();
   }
 
   sendToolResult(name: string, result: unknown) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ type: 'tool_result', name, result }));
     }
+  }
+
+  private finish() {
+    if (this.isClosed) return;
+    this.isClosed = true;
+    this.isReady = false;
+    this.socket = undefined;
+    void this.audio.stop();
+    this.callbacks.onState('closed');
   }
 }
