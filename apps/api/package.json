@@ -28,6 +28,7 @@
     "express-zod-api": "^28.0.0",
     "http-errors": "^2.0.1",
     "pg": "^8.16.0",
+    "sarvamai": "^1.1.8",
     "zod": "4.3.6"
   },
   "devDependencies": {

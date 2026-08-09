@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createServer, Documentation } from "express-zod-api";
 import { apiReference } from "@scalar/express-api-reference";
 import cors from "cors";
+import express from "express";
 import { toNodeHandler } from "better-auth/node";
 import { routing } from "./routing.js";
 import { auth } from "./auth.js";
@@ -34,6 +35,7 @@ const config = {
   http: {
     listen: 3000,
   },
+  jsonParser: express.json({ limit: "1mb" }),
   beforeRouting: ({ app, getLogger }: { app: any; getLogger: any }) => {
     app.use(
       cors({
@@ -52,6 +54,7 @@ const config = {
       composition: "inline",
       tags: {
         users: { description: "User account management" },
+        tts: { description: "Narration and text-to-speech via Sarvam" },
       },
     });
 

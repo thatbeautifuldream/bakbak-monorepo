@@ -123,3 +123,469 @@ export type PatchV1MeResponses = {
 };
 
 export type PatchV1MeResponse = PatchV1MeResponses[keyof PatchV1MeResponses];
+
+export type GetV1TtsVoicesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/v1/tts/voices";
+};
+
+export type GetV1TtsVoicesErrors = {
+  /**
+   * GET /v1/tts/voices Negative response
+   */
+  400: {
+    status: "error";
+    error: {
+      message: string;
+    };
+  };
+};
+
+export type GetV1TtsVoicesError =
+  GetV1TtsVoicesErrors[keyof GetV1TtsVoicesErrors];
+
+export type GetV1TtsVoicesResponses = {
+  /**
+   * GET /v1/tts/voices Positive response
+   */
+  200: {
+    status: "success";
+    data: {
+      /**
+       * Available TTS models and their voices
+       */
+      models: Array<{
+        /**
+         * Bulbul model version
+         */
+        id: "bulbul:v3" | "bulbul:v2";
+        /**
+         * Voices valid for this model
+         */
+        speakers: Array<
+          | "shubh"
+          | "aditya"
+          | "ritu"
+          | "priya"
+          | "neha"
+          | "rahul"
+          | "pooja"
+          | "rohan"
+          | "simran"
+          | "kavya"
+          | "amit"
+          | "dev"
+          | "ishita"
+          | "shreya"
+          | "ratan"
+          | "varun"
+          | "manan"
+          | "sumit"
+          | "roopa"
+          | "kabir"
+          | "aayan"
+          | "ashutosh"
+          | "advait"
+          | "anand"
+          | "tanya"
+          | "tarun"
+          | "sunny"
+          | "mani"
+          | "gokul"
+          | "vijay"
+          | "shruti"
+          | "suhani"
+          | "mohit"
+          | "kavitha"
+          | "rehan"
+          | "soham"
+          | "rupali"
+          | "anushka"
+          | "manisha"
+          | "vidya"
+          | "arya"
+          | "abhilash"
+          | "karun"
+          | "hitesh"
+        >;
+        /**
+         * Only bulbul:v2 accepts pitch and loudness
+         */
+        supportsPitchAndLoudness: boolean;
+        /**
+         * Only bulbul:v3 accepts temperature
+         */
+        supportsTemperature: boolean;
+        /**
+         * Sarvam per-request text limit
+         */
+        maxCharsPerRequest: number;
+      }>;
+      /**
+       * Languages available for narration
+       */
+      languages: Array<
+        | "bn-IN"
+        | "en-IN"
+        | "gu-IN"
+        | "hi-IN"
+        | "kn-IN"
+        | "ml-IN"
+        | "mr-IN"
+        | "od-IN"
+        | "pa-IN"
+        | "ta-IN"
+        | "te-IN"
+      >;
+      /**
+       * Narration tones for script preparation
+       */
+      contentTypes: Array<"news" | "fiction" | "education" | "general">;
+      /**
+       * Supported output codecs
+       */
+      audioCodecs: Array<
+        "mp3" | "wav" | "opus" | "flac" | "aac" | "linear16" | "mulaw" | "alaw"
+      >;
+      /**
+       * Supported output sample rates
+       */
+      sampleRates: Array<number>;
+    };
+  };
+};
+
+export type GetV1TtsVoicesResponse =
+  GetV1TtsVoicesResponses[keyof GetV1TtsVoicesResponses];
+
+export type HeadV1TtsVoicesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/v1/tts/voices";
+};
+
+export type HeadV1TtsVoicesErrors = {
+  /**
+   * HEAD /v1/tts/voices Negative response
+   */
+  400: unknown;
+};
+
+export type HeadV1TtsVoicesResponses = {
+  /**
+   * HEAD /v1/tts/voices Positive response
+   */
+  200: unknown;
+};
+
+export type PostV1TtsPlanData = {
+  /**
+   * POST /v1/tts/plan Request body
+   */
+  body: {
+    /**
+     * Extracted article text from the page
+     */
+    text: string;
+    /**
+     * Page or article title
+     */
+    title?: string;
+    /**
+     * Narration tone applied while preparing the script
+     */
+    contentType?: "news" | "fiction" | "education" | "general";
+    /**
+     * Run an LLM pass to strip navigation and boilerplate and expand abbreviations
+     */
+    prepare?: boolean;
+    /**
+     * Language of the supplied text; 'auto' detects it
+     */
+    sourceLanguageCode?:
+      | "bn-IN"
+      | "en-IN"
+      | "gu-IN"
+      | "hi-IN"
+      | "kn-IN"
+      | "ml-IN"
+      | "mr-IN"
+      | "od-IN"
+      | "pa-IN"
+      | "ta-IN"
+      | "te-IN"
+      | "auto";
+    /**
+     * Translate the script into this language before narrating
+     */
+    targetLanguageCode?:
+      | "bn-IN"
+      | "en-IN"
+      | "gu-IN"
+      | "hi-IN"
+      | "kn-IN"
+      | "ml-IN"
+      | "mr-IN"
+      | "od-IN"
+      | "pa-IN"
+      | "ta-IN"
+      | "te-IN";
+    /**
+     * Used only to estimate narration length
+     */
+    pace?: number;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/tts/plan";
+};
+
+export type PostV1TtsPlanErrors = {
+  /**
+   * POST /v1/tts/plan Negative response
+   */
+  400: {
+    status: "error";
+    error: {
+      message: string;
+    };
+  };
+};
+
+export type PostV1TtsPlanError = PostV1TtsPlanErrors[keyof PostV1TtsPlanErrors];
+
+export type PostV1TtsPlanResponses = {
+  /**
+   * POST /v1/tts/plan Positive response
+   */
+  200: {
+    status: "success";
+    data: {
+      /**
+       * Language to pass to /v1/tts/speak
+       */
+      languageCode:
+        | "bn-IN"
+        | "en-IN"
+        | "gu-IN"
+        | "hi-IN"
+        | "kn-IN"
+        | "ml-IN"
+        | "mr-IN"
+        | "od-IN"
+        | "pa-IN"
+        | "ta-IN"
+        | "te-IN";
+      /**
+       * Detected or supplied source language
+       */
+      sourceLanguageCode: string;
+      /**
+       * Whether the LLM clean-up pass ran
+       */
+      prepared: boolean;
+      /**
+       * Whether the script was translated
+       */
+      translated: boolean;
+      /**
+       * Ordered chunks, each within the TTS character limit
+       */
+      chunks: Array<{
+        /**
+         * Playback order, zero-based
+         */
+        index: number;
+        /**
+         * Narration text for this chunk
+         */
+        text: string;
+      }>;
+      /**
+       * Total characters to be narrated
+       */
+      totalChars: number;
+      /**
+       * Rough narration duration at the given pace
+       */
+      estimatedSeconds: number;
+    };
+  };
+};
+
+export type PostV1TtsPlanResponse =
+  PostV1TtsPlanResponses[keyof PostV1TtsPlanResponses];
+
+export type PostV1TtsSpeakData = {
+  /**
+   * POST /v1/tts/speak Request body
+   */
+  body: {
+    /**
+     * A single chunk from /v1/tts/plan
+     */
+    text: string;
+    /**
+     * BCP-47 language code
+     */
+    languageCode:
+      | "bn-IN"
+      | "en-IN"
+      | "gu-IN"
+      | "hi-IN"
+      | "kn-IN"
+      | "ml-IN"
+      | "mr-IN"
+      | "od-IN"
+      | "pa-IN"
+      | "ta-IN"
+      | "te-IN";
+    /**
+     * Bulbul model version
+     */
+    model?: "bulbul:v3" | "bulbul:v2";
+    /**
+     * Defaults to the model's default voice
+     */
+    speaker?:
+      | "shubh"
+      | "aditya"
+      | "ritu"
+      | "priya"
+      | "neha"
+      | "rahul"
+      | "pooja"
+      | "rohan"
+      | "simran"
+      | "kavya"
+      | "amit"
+      | "dev"
+      | "ishita"
+      | "shreya"
+      | "ratan"
+      | "varun"
+      | "manan"
+      | "sumit"
+      | "roopa"
+      | "kabir"
+      | "aayan"
+      | "ashutosh"
+      | "advait"
+      | "anand"
+      | "tanya"
+      | "tarun"
+      | "sunny"
+      | "mani"
+      | "gokul"
+      | "vijay"
+      | "shruti"
+      | "suhani"
+      | "mohit"
+      | "kavitha"
+      | "rehan"
+      | "soham"
+      | "rupali"
+      | "anushka"
+      | "manisha"
+      | "vidya"
+      | "arya"
+      | "abhilash"
+      | "karun"
+      | "hitesh";
+    /**
+     * Speech rate; 1.0 is natural pace
+     */
+    pace?: number;
+    /**
+     * Expressiveness; bulbul:v3 only
+     */
+    temperature?: number;
+    /**
+     * bulbul:v2 only
+     */
+    pitch?: number;
+    /**
+     * bulbul:v2 only
+     */
+    loudness?: number;
+    /**
+     * Output sample rate in Hz
+     */
+    sampleRate?: 8000 | 16000 | 22050 | 24000 | 32000 | 44100 | 48000;
+    /**
+     * Output audio codec
+     */
+    codec?:
+      | "mp3"
+      | "wav"
+      | "opus"
+      | "flac"
+      | "aac"
+      | "linear16"
+      | "mulaw"
+      | "alaw";
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/tts/speak";
+};
+
+export type PostV1TtsSpeakErrors = {
+  /**
+   * POST /v1/tts/speak Negative response
+   */
+  400: {
+    status: "error";
+    error: {
+      message: string;
+    };
+  };
+};
+
+export type PostV1TtsSpeakError =
+  PostV1TtsSpeakErrors[keyof PostV1TtsSpeakErrors];
+
+export type PostV1TtsSpeakResponses = {
+  /**
+   * POST /v1/tts/speak Positive response
+   */
+  200: {
+    status: "success";
+    data: {
+      /**
+       * Base64-encoded audio for this chunk
+       */
+      audio: string;
+      /**
+       * Codec of the returned audio
+       */
+      codec:
+        | "mp3"
+        | "wav"
+        | "opus"
+        | "flac"
+        | "aac"
+        | "linear16"
+        | "mulaw"
+        | "alaw";
+      /**
+       * Sample rate of the returned audio
+       */
+      sampleRate: number;
+      /**
+       * Characters narrated
+       */
+      chars: number;
+      /**
+       * Sarvam request id, for support
+       */
+      requestId?: string;
+    };
+  };
+};
+
+export type PostV1TtsSpeakResponse =
+  PostV1TtsSpeakResponses[keyof PostV1TtsSpeakResponses];

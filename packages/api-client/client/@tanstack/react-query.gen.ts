@@ -3,14 +3,30 @@
 import { queryOptions, type UseMutationOptions } from "@tanstack/react-query";
 
 import { client } from "../client.gen";
-import { getV1Me, type Options, patchV1Me } from "../sdk.gen";
+import {
+  getV1Me,
+  getV1TtsVoices,
+  type Options,
+  patchV1Me,
+  postV1TtsPlan,
+  postV1TtsSpeak,
+} from "../sdk.gen";
 import type {
   GetV1MeData,
   GetV1MeError,
   GetV1MeResponse,
+  GetV1TtsVoicesData,
+  GetV1TtsVoicesError,
+  GetV1TtsVoicesResponse,
   PatchV1MeData,
   PatchV1MeError,
   PatchV1MeResponse,
+  PostV1TtsPlanData,
+  PostV1TtsPlanError,
+  PostV1TtsPlanResponse,
+  PostV1TtsSpeakData,
+  PostV1TtsSpeakError,
+  PostV1TtsSpeakResponse,
 } from "../types.gen";
 
 export type QueryKey<TOptions extends Options> = [
@@ -99,6 +115,91 @@ export const patchV1MeMutation = (
   > = {
     mutationFn: async (fnOptions) => {
       const { data } = await patchV1Me({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const getV1TtsVoicesQueryKey = (options?: Options<GetV1TtsVoicesData>) =>
+  createQueryKey("getV1TtsVoices", options);
+
+/**
+ * List voices and narration options
+ *
+ * Returns the Bulbul models, their compatible voices, supported languages, narration tones, codecs and sample rates. Use this to populate voice pickers instead of hardcoding values.
+ */
+export const getV1TtsVoicesOptions = (options?: Options<GetV1TtsVoicesData>) =>
+  queryOptions<
+    GetV1TtsVoicesResponse,
+    GetV1TtsVoicesError,
+    GetV1TtsVoicesResponse,
+    ReturnType<typeof getV1TtsVoicesQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getV1TtsVoices({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getV1TtsVoicesQueryKey(options),
+  });
+
+/**
+ * Build a narration script
+ *
+ * Turns raw page text into an ordered list of narration-ready chunks: optional LLM clean-up, optional translation, then splitting at sentence boundaries within the TTS character limit. Returns no audio — call /v1/tts/speak per chunk and prefetch ahead of playback.
+ */
+export const postV1TtsPlanMutation = (
+  options?: Partial<Options<PostV1TtsPlanData>>,
+): UseMutationOptions<
+  PostV1TtsPlanResponse,
+  PostV1TtsPlanError,
+  Options<PostV1TtsPlanData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    PostV1TtsPlanResponse,
+    PostV1TtsPlanError,
+    Options<PostV1TtsPlanData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await postV1TtsPlan({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+/**
+ * Synthesize one chunk
+ *
+ * Converts a single narration chunk into base64-encoded audio using Sarvam Bulbul. Text must be within the TTS character limit — use /v1/tts/plan to split longer content.
+ */
+export const postV1TtsSpeakMutation = (
+  options?: Partial<Options<PostV1TtsSpeakData>>,
+): UseMutationOptions<
+  PostV1TtsSpeakResponse,
+  PostV1TtsSpeakError,
+  Options<PostV1TtsSpeakData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    PostV1TtsSpeakResponse,
+    PostV1TtsSpeakError,
+    Options<PostV1TtsSpeakData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await postV1TtsSpeak({
         ...options,
         ...fnOptions,
         throwOnError: true,

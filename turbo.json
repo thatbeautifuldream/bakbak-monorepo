@@ -1,6 +1,14 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  "globalEnv": ["NODE_ENV", "DATABASE_URL", "BETTER_AUTH_SECRET", "NEXT_PUBLIC_API_URL"],
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "BETTER_AUTH_SECRET",
+    "NEXT_PUBLIC_API_URL",
+    "SARVAM_API_KEY",
+    "SARVAM_TEXT_MODEL",
+    "SARVAM_TRANSLATE_MODEL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
