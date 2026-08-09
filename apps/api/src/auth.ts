@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { fromNodeHeaders } from "better-auth/node";
-import { oAuthProxy } from "better-auth/plugins";
+import { bearer, oAuthProxy } from "better-auth/plugins";
 import { defaultEndpointsFactory, Middleware } from "express-zod-api";
 import createError from "http-errors";
 import { db } from "./db/index.js";
@@ -55,7 +55,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
   },
   socialProviders: googleProvider,
-  plugins: [oAuthProxy()],
+  plugins: [oAuthProxy(), bearer()],
   user: {
     additionalFields: {
       role: {
