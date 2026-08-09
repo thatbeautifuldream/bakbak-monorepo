@@ -8,8 +8,36 @@ const PROTECTED_PREFIXES = [
 
 const ANON_ONLY_PATHS = ["/", "/login", "/signup"]
 
+/**
+ * Browser → API traffic is same-origin so the session cookie survives iOS Safari.
+ * Resolved per request: a `next.config` rewrite would bake the destination into
+ * the build, so a missing env var there silently ships a proxy to localhost.
+ */
+function forwardToApi(request: NextRequest) {
+  const { pathname, search } = request.nextUrl
+  const apiUrl = process.env.API_URL
+
+  if (!apiUrl) {
+    return NextResponse.json(
+      { error: { message: "API_URL is not configured" } },
+      { status: 500 }
+    )
+  }
+
+  const path = pathname.startsWith("/api/proxy")
+    ? pathname.slice("/api/proxy".length)
+    : pathname
+
+  return NextResponse.rewrite(new URL(`${path}${search}`, apiUrl))
+}
+
 export function proxy(request: NextRequest) {
   const { pathname, search, searchParams } = request.nextUrl
+
+  if (pathname.startsWith("/api/auth/") || pathname.startsWith("/api/proxy/")) {
+    return forwardToApi(request)
+  }
+
   const sessionCookie = getSessionCookie(request)
 
   const isProtected = PROTECTED_PREFIXES.some(
@@ -36,5 +64,7 @@ export const config = {
   matcher: [
     "/", "/login", "/signup",
     "/dashboard/:path*",
+    "/api/auth/:path*",
+    "/api/proxy/:path*",
   ],
 }
