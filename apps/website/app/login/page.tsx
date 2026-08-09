@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState, useTransition } from "react"
-import { RiArrowRightLine, RiGoogleFill, RiMicLine } from "@remixicon/react"
+import { RiArrowRightLine, RiMicLine } from "@remixicon/react"
 import { signIn, signUp } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -71,14 +71,6 @@ function LoginContent() {
       }
 
       router.replace(destination)
-    })
-  }
-
-  const handleGoogle = async () => {
-    await signIn.social({
-      provider: "google",
-      callbackURL: `${window.location.origin}${destination}`,
-      errorCallbackURL: `${window.location.origin}/login`,
     })
   }
 
@@ -197,22 +189,6 @@ function LoginContent() {
                 <RiArrowRightLine className="size-4" />
               </Button>
             </form>
-
-            <div className="my-5 flex items-center gap-3 text-xs text-[#756e68] dark:text-[#c9c0b6]">
-              <div className="h-px flex-1 bg-[#d8cfc4] dark:bg-[#4c433e]" />
-              or
-              <div className="h-px flex-1 bg-[#d8cfc4] dark:bg-[#4c433e]" />
-            </div>
-            <Button
-              variant="outline"
-              size="xl"
-              className="h-11 w-full rounded-xl border-[#d8cfc4] bg-transparent hover:bg-[#eee8df] dark:border-[#4c433e] dark:hover:bg-[#24211f]"
-              onClick={handleGoogle}
-              type="button"
-            >
-              <RiGoogleFill data-icon="inline-start" />
-              Continue with Google
-            </Button>
           </div>
           <p className="mt-6 text-center text-sm text-[#756e68] dark:text-[#c9c0b6]">
             {isSignUp ? "Already have an account?" : "New to BakBak?"}{" "}
