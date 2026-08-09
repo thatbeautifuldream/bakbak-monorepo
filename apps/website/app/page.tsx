@@ -3,11 +3,17 @@ import Link from "next/link"
 import {
   RiArrowRightLine,
   RiCornerDownRightLine,
+  RiDownloadLine,
   RiMicLine,
   RiStopFill,
 } from "@remixicon/react"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import {
+  EXTENSION_DOWNLOAD_URL,
+  EXTENSION_VERSION,
+  INSTALL_STEPS,
+} from "@/lib/extension"
 
 export const metadata: Metadata = {
   title: "Bakbak · Talk to the web",
@@ -150,6 +156,54 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section id="install" className="scroll-mt-8 px-5 pb-20 sm:px-8 lg:pb-28">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="max-w-[20ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                Add it to Chrome in a minute.
+              </h2>
+              <p className="mt-4 max-w-[56ch] text-base/7 text-pretty text-muted-foreground">
+                Bakbak is not on the Chrome Web Store yet, so it installs from a
+                folder you unzip yourself.
+              </p>
+            </div>
+            <Button
+              asChild
+              size="lg"
+              variant="secondary"
+              className="w-fit shrink-0"
+            >
+              <a href={EXTENSION_DOWNLOAD_URL}>
+                Download for Chrome
+                <RiDownloadLine />
+              </a>
+            </Button>
+          </div>
+
+          <ol
+            role="list"
+            className="mt-10 grid gap-x-10 gap-y-8 border-t border-border pt-8 md:grid-cols-3"
+          >
+            {INSTALL_STEPS.map((step, index) => (
+              <li key={step.label}>
+                <p className="font-mono text-[0.6875rem] text-muted-foreground">
+                  Step {index + 1}
+                </p>
+                <h3 className="mt-1 text-base font-medium">{step.label}</h3>
+                <p className="mt-2 max-w-[38ch] text-sm/6 text-pretty text-muted-foreground">
+                  {step.detail}
+                </p>
+              </li>
+            ))}
+          </ol>
+
+          <p className="mt-8 text-sm text-muted-foreground">
+            Version {EXTENSION_VERSION} for Chrome and other Chromium browsers.
+          </p>
         </div>
       </section>
 
