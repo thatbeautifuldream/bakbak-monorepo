@@ -103,8 +103,55 @@ async function getSessionToken() {
 export type VoiceClientCallbacks = {
   onMessage: (message: VoiceMessage) => void;
   onState: (state: 'connecting' | 'connected' | 'closed') => void;
+  onLevel?: (level: number) => void;
   onError?: (message: string) => void;
 };
+
+const findElement = (elementId: unknown) =>
+  typeof elementId === 'string'
+    ? document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`)
+    : null;
+
+const describeTarget = (elementId: unknown) => {
+  const element = findElement(elementId);
+  const label = element ? getElementLabel(element).trim().slice(0, 40) : '';
+  return label ? `“${label}”` : 'an element';
+};
+
+/** Human label for a tool call that changes the page. Read-only tools return null. */
+export function describeWebsiteTool(
+  name: string,
+  args: Record<string, unknown> = {},
+): string | null {
+  const scrolled = (direction: unknown) =>
+    direction === 'up' || direction === 'scroll_up' ? 'Scrolled up' : 'Scrolled down';
+
+  switch (name) {
+    case 'browser_action': {
+      const action = args.action;
+      if (action === 'scroll_up' || action === 'scroll_down') return scrolled(action);
+      if (action === 'go_back') return 'Went back';
+      if (action === 'click') return `Clicked ${describeTarget(args.element_id)}`;
+      return null;
+    }
+    case 'click_element':
+      return `Clicked ${describeTarget(args.element_id)}`;
+    case 'fill_element':
+      return `Filled ${describeTarget(args.element_id)}`;
+    case 'scroll_page':
+      return scrolled(args.direction);
+    case 'navigate_to_page':
+      try {
+        return `Opened ${new URL(String(args.url), location.href).hostname.replace(/^www\./, '')}`;
+      } catch {
+        return 'Opened a page';
+      }
+    case 'go_back':
+      return 'Went back';
+    default:
+      return null;
+  }
+}
 
 export async function executeWebsiteTool(
   name: string,
@@ -256,10 +303,22 @@ export class VoiceClient {
     });
 
     await this.audio.start(async (audio) => {
+      this.emitLevel(audio);
       if (this.socket?.readyState === WebSocket.OPEN && this.isReady) {
         this.socket.send(JSON.stringify({ type: 'audio', audio: encode(audio) }));
       }
     });
+  }
+
+  /** RMS of the captured PCM16 chunk, normalised to 0–1 so the UI meter reflects the real mic. */
+  private emitLevel(audio: Uint8Array) {
+    if (!this.callbacks.onLevel) return;
+    const samples = new Int16Array(audio.buffer, audio.byteOffset, audio.byteLength >> 1);
+    if (samples.length === 0) return;
+    let sum = 0;
+    for (const sample of samples) sum += sample * sample;
+    const rms = Math.sqrt(sum / samples.length) / 32768;
+    this.callbacks.onLevel(Math.min(1, rms * 6));
   }
 
   stop() {
@@ -283,6 +342,7 @@ export class VoiceClient {
     this.isReady = false;
     this.socket = undefined;
     void this.audio.stop();
+    this.callbacks.onLevel?.(0);
     this.callbacks.onState('closed');
   }
 }
