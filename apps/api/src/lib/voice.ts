@@ -6,8 +6,25 @@ import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../auth.js";
 
 type ClientMessage =
+  | {
+      type: "init";
+      context: {
+        page_title: string;
+        page_url: string;
+        page_hostname: string;
+        page_language: string;
+        meta_description: string;
+        canonical_url: string;
+        page_content: string;
+        page_headings: string;
+        page_links: string;
+        accessibility_tree: string;
+        selected_text: string;
+      };
+    }
   | { type: "audio"; audio: string }
-  | { type: "stop" };
+  | { type: "stop" }
+  | { type: "tool_result"; name: string; result: unknown };
 
 const serverAudioInterface: AsyncAudioInterface = {
   start: async () => undefined,
@@ -23,7 +40,7 @@ const getSessionToken = (request: IncomingMessage) => {
   return values[0] === "bearer" ? values[1] : undefined;
 };
 
-const getVoiceConfig = () => {
+const getVoiceConfig = (agentVariables: Record<string, string>) => {
   const orgId = process.env.SARVAM_ORG_ID;
   const workspaceId = process.env.SARVAM_WORKSPACE_ID;
   const appId = process.env.SARVAM_VOICE_AGENT_ID;
@@ -43,8 +60,24 @@ const getVoiceConfig = () => {
     interaction_type: InteractionType.CALL,
     input_sample_rate: 16000 as const,
     output_sample_rate: 16000 as const,
+    agent_variables: agentVariables,
   };
 };
+
+const waitForContext = (socket: WebSocket) =>
+  new Promise<Record<string, string>>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Page context timed out")), 10000);
+    socket.once("message", (raw) => {
+      clearTimeout(timeout);
+      try {
+        const message = JSON.parse(raw.toString()) as ClientMessage;
+        if (message.type !== "init") throw new Error("Page context is required");
+        resolve(message.context);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 
 const send = (socket: WebSocket, message: unknown) => {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -78,9 +111,12 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
 
   let agent: ConversationAgent;
   try {
+    const contextPromise = waitForContext(socket);
+    send(socket, { type: "context_required" });
+    const agentVariables = await contextPromise;
     agent = new ConversationAgent({
       apiKey,
-      config: getVoiceConfig(),
+      config: getVoiceConfig(agentVariables),
       platform: "node",
       audioInterface: serverAudioInterface,
       audioCallback: async (message) => send(socket, message),
