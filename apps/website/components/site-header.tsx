@@ -12,36 +12,32 @@ export async function SiteHeader() {
         <Link
           href="/"
           aria-label="Bakbak home"
-          className="text-lg font-bold tracking-[-0.05em]"
+          className="text-base font-semibold tracking-tight"
         >
           Bakbak
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <nav
             aria-label="Primary navigation"
             className="hidden items-center gap-4 sm:flex"
           >
             <Link
               href="/analytics"
-              className="text-sm font-semibold text-[#5d5853] transition-colors hover:text-[#171616] dark:text-[#c9c0b6] dark:hover:text-[#f8f1e8]"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Signal desk
             </Link>
             {!isSignedIn ? (
               <Link
                 href="/login"
-                className="text-sm font-semibold text-[#5d5853] transition-colors hover:text-[#171616] dark:text-[#c9c0b6] dark:hover:text-[#f8f1e8]"
+                className="text-sm text-muted-foreground hover:text-foreground"
               >
                 Sign in
               </Link>
             ) : null}
           </nav>
-          <Button
-            asChild
-            size="lg"
-            className="h-10 rounded-full border-[#e95f45] bg-[#e95f45] px-4 text-sm text-[#fffaf2] shadow-[0_8px_20px_-14px_#bf4633] hover:bg-[#bf4633]"
-          >
+          <Button asChild>
             <Link href={isSignedIn ? "/dashboard" : "/login"}>
               {isSignedIn ? "Dashboard" : "Try Bakbak"}
             </Link>

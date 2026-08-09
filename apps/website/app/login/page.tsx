@@ -17,7 +17,7 @@ function Brand() {
     <Link
       href="/"
       aria-label="Bakbak home"
-      className="w-fit text-lg font-bold tracking-[-0.05em]"
+      className="w-fit text-base font-semibold tracking-tight"
     >
       Bakbak
     </Link>
@@ -72,15 +72,15 @@ function LoginContent() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f7f3ed] text-[#171616] dark:bg-[#1f1c1a] dark:text-[#f8f1e8]">
+    <main className="min-h-dvh bg-background text-foreground">
       <nav className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Brand />
-          <p className="text-sm text-[#756e68] dark:text-[#c9c0b6]">
+          <p className="text-sm text-muted-foreground">
             {isSignUp ? "Already a member?" : "New to Bakbak?"}{" "}
             <button
               type="button"
-              className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
               onClick={() => switchMode(isSignUp ? "signin" : "signup")}
             >
               {isSignUp ? "Sign in" : "Create an account"}
@@ -89,42 +89,33 @@ function LoginContent() {
         </div>
       </nav>
 
-      <section className="mx-auto grid min-h-[calc(100dvh-5rem)] max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,0.7fr)] lg:gap-20">
+      <section className="mx-auto grid min-h-[calc(100dvh-5rem)] max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)] lg:gap-20">
         <div className="hidden max-w-xl lg:block">
-          <p className="flex items-center gap-2 text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
-            <span className="size-2 rounded-full bg-[#e95f45] shadow-[0_0_0_5px_rgba(233,95,69,0.12)]" />
-            Your voice companion
-          </p>
-          <h1 className="mt-6 text-[clamp(3.5rem,6vw,5.75rem)] leading-[0.9] font-semibold tracking-[-0.08em]">
+          <h1 className="text-4xl font-semibold tracking-tight text-balance xl:text-5xl">
             Take the web at your own pace.
           </h1>
-          <p className="mt-7 max-w-md text-lg leading-7 text-[#5d5853] dark:text-[#c9c0b6]">
+          <p className="mt-5 max-w-[56ch] text-base/7 text-pretty text-muted-foreground">
             Bakbak meets you on the page you are already reading. You decide
             when the conversation begins.
           </p>
-          <div className="mt-10 flex items-center gap-3 text-sm text-[#756e68] dark:text-[#c9c0b6]">
-            <span className="grid size-10 place-items-center rounded-full bg-[#e95f45]/12 text-[#b34d3b] dark:text-[#f39b87]">
-              <RiMicLine className="size-5" />
-            </span>
-            Mic starts only after you ask.
-          </div>
+          <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+            <RiMicLine className="size-4 shrink-0" />
+            Your mic only starts after you ask.
+          </p>
         </div>
 
         <div className="w-full max-w-md justify-self-center">
-          <div className="rounded-[1.75rem] border border-[#d8cfc4] bg-[#fffaf2] p-6 shadow-[0_28px_64px_-38px_rgba(23,22,22,0.5)] sm:p-8 dark:border-[#4c433e] dark:bg-[#302b28]">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
             <div className="lg:hidden">
               <Brand />
             </div>
             <div className="mt-7 lg:mt-0">
-              <p className="text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
-                {isSignUp ? "Join Bakbak" : "Welcome back"}
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em]">
+              <h2 className="text-2xl font-semibold tracking-tight">
                 {isSignUp
                   ? "A little more room to think."
                   : "Pick up where you left off."}
               </h2>
-              <p className="mt-3 text-sm leading-6 text-[#5d5853] dark:text-[#c9c0b6]">
+              <p className="mt-2 text-sm/6 text-muted-foreground">
                 {isSignUp
                   ? "Create your account to start talking through the web."
                   : "Sign in to return to your Bakbak space."}
@@ -171,14 +162,14 @@ function LoginContent() {
                 />
               </div>
               {error ? (
-                <p className="rounded-xl bg-[#e95f45]/10 px-3 py-2 text-sm text-[#b34d3b] dark:text-[#f39b87]">
+                <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive-foreground">
                   {error}
                 </p>
               ) : null}
               <Button
                 type="submit"
-                size="xl"
-                className="mt-1 h-11 w-full rounded-xl border-[#e95f45] bg-[#e95f45] text-[#fffaf2] hover:bg-[#bf4633]"
+                size="lg"
+                className="mt-1 w-full"
                 disabled={isPending}
               >
                 {isPending ? <Spinner data-icon="inline-start" /> : null}
@@ -187,11 +178,11 @@ function LoginContent() {
               </Button>
             </form>
           </div>
-          <p className="mt-6 text-center text-sm text-[#756e68] dark:text-[#c9c0b6]">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             {isSignUp ? "Already have an account?" : "New to Bakbak?"}{" "}
             <button
               type="button"
-              className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
               onClick={() => switchMode(isSignUp ? "signin" : "signup")}
             >
               {isSignUp ? "Sign in" : "Create one"}

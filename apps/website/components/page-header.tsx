@@ -13,7 +13,7 @@ export function PageHeader({ title, actions, className }: PageHeaderProps) {
   return (
     <header
       className={cn(
-        "flex h-[calc(var(--header-height)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-[#d8cfc4] bg-[#f7f3ed]/92 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:px-6 dark:border-[#4c433e] dark:bg-[#1f1c1a]/92",
+        "flex h-[calc(var(--header-height)+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:px-6",
         className
       )}
     >

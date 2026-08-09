@@ -65,7 +65,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar
       collapsible="offcanvas"
-      className="[--sidebar-accent-foreground:#24201e] [--sidebar-accent:#eee8df] [--sidebar-border:#d8cfc4] [--sidebar-foreground:#24201e] [--sidebar:#f7f3ed] dark:[--sidebar-accent-foreground:#f8f1e8] dark:[--sidebar-accent:#302b28] dark:[--sidebar-border:#4c433e] dark:[--sidebar-foreground:#f8f1e8] dark:[--sidebar:#24211f]"
       {...props}
     >
       <SidebarHeader>
@@ -73,7 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <Link
             href="/dashboard"
             aria-label="Bakbak home"
-            className="rounded-xl px-2 py-1.5 text-lg font-bold tracking-[-0.05em] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="rounded-lg px-2 py-1.5 text-base font-semibold tracking-tight text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             Bakbak
           </Link>
@@ -104,12 +103,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
-        <div className="mx-3 mt-5 rounded-2xl border border-[#d8cfc4] bg-[#fffaf2] p-3.5 dark:border-[#4c433e] dark:bg-[#302b28]">
-          <RiSparkling2Line className="size-4 text-[#b34d3b] dark:text-[#f39b87]" />
-          <p className="mt-3 text-xs font-semibold tracking-[-0.02em]">
-            Ready to listen
-          </p>
-          <p className="mt-1 text-[11px] leading-4 text-sidebar-foreground/65">
+        <div className="mx-3 mt-5 rounded-lg border border-border bg-card p-3.5">
+          <RiSparkling2Line className="size-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-medium">Ready to listen</p>
+          <p className="mt-1 text-xs/5 text-muted-foreground">
             Open any page, then start a conversation when you need one.
           </p>
         </div>

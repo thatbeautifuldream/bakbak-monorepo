@@ -40,11 +40,11 @@ export type AnalyticsData = {
 }
 
 const tones = {
-  coral: "bg-[#dc5f3e]",
-  red: "bg-[#d74d4d]",
-  violet: "bg-[#7564d7]",
-  blue: "bg-[#3576a8]",
-  amber: "bg-[#ce8b39]",
+  coral: "bg-chart-1",
+  red: "bg-chart-5",
+  violet: "bg-chart-4",
+  blue: "bg-chart-3",
+  amber: "bg-chart-2",
   graphite: "bg-muted-foreground/50",
 }
 
@@ -99,13 +99,10 @@ export default function AnalyticsDashboard({
       <section className="border-b border-border/80 bg-muted/25">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:px-6 sm:py-10 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-              Audience intelligence
-            </p>
-            <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-[-0.04em] text-balance sm:text-4xl">
+            <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
               Aggregate web activity
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="mt-3 max-w-[64ch] text-sm/6 text-pretty text-muted-foreground sm:text-base/7">
               A clear view of where the network spends time, how visits change,
               and which pages are ready for conversation.
             </p>
@@ -124,7 +121,7 @@ export default function AnalyticsDashboard({
               className="py-6 sm:px-5 sm:py-6 sm:first:pl-0 sm:last:pr-0"
             >
               <p className="text-sm text-muted-foreground">{metric.label}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] tabular-nums">
+              <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                 {metric.value}
               </p>
               <div className="mt-2 flex items-center gap-2 text-xs">
@@ -171,7 +168,7 @@ export default function AnalyticsDashboard({
                 <polyline
                   points={`${data.chart.points} 720,180 0,180`}
                   fill="currentColor"
-                  className="text-[#dc5f3e]/10 dark:text-[#dc8969]/15"
+                  className="text-chart-1/10"
                 />
                 <polyline
                   points={data.chart.points}
@@ -180,17 +177,17 @@ export default function AnalyticsDashboard({
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="text-[#dc5f3e]"
+                  className="text-chart-1"
                 />
                 <circle
                   cx={lastPoint[0]}
                   cy={lastPoint[1]}
                   r="5"
                   fill="currentColor"
-                  className="text-[#dc5f3e]"
+                  className="text-chart-1"
                 />
               </svg>
-              <div className="flex justify-between px-1 text-[11px] font-medium text-muted-foreground">
+              <div className="flex justify-between px-1 text-xs text-muted-foreground">
                 {data.chart.labels.map((label) => (
                   <span key={label}>{label}</span>
                 ))}
@@ -264,7 +261,7 @@ export default function AnalyticsDashboard({
                     >
                       <td className="px-5 py-4 sm:px-6">
                         <div className="flex items-center gap-3">
-                          <span className="grid size-7 place-items-center rounded-md bg-muted text-[11px] font-semibold text-muted-foreground">
+                          <span className="grid size-7 place-items-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
                             {index + 1}
                           </span>
                           <div>
