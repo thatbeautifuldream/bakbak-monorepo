@@ -1,0 +1,31 @@
+{
+  "name": "@repo/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client": "./client/client.gen.ts",
+    "./sdk": "./client/sdk.gen.ts",
+    "./types": "./client/types.gen.ts",
+    "./react-query": "./client/@tanstack/react-query.gen.ts"
+  },
+  "scripts": {
+    "build": "openapi-ts",
+    "dev": "openapi-ts --watch",
+    "generate-client": "openapi-ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@hey-api/client-fetch": "0.13.1",
+    "@hey-api/openapi-ts": "0.97.1",
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@tanstack/react-query": "^5.100.5",
+    "prettier": "^3.8.1",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.100.5"
+  }
+}

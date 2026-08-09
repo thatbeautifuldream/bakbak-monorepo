@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env*.local
+.DS_Store
+coverage/
+.idea/
+.npmrc
+.turbo/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+packages/api-client/*.log
