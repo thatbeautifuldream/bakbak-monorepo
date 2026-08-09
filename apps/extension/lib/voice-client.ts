@@ -16,6 +16,63 @@ type VoiceMessage = {
   parameters?: Record<string, unknown>;
 };
 
+export type WebsiteContext = {
+  page_title: string;
+  page_url: string;
+  page_hostname: string;
+  page_language: string;
+  meta_description: string;
+  canonical_url: string;
+  page_content: string;
+  page_headings: string;
+  page_links: string;
+  accessibility_tree: string;
+  selected_text: string;
+};
+
+const interactiveSelector = [
+  'a[href]',
+  'button',
+  'input:not([type="hidden"])',
+  'select',
+  'textarea',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="checkbox"]',
+  '[role="radio"]',
+  '[role="switch"]',
+  '[contenteditable="true"]',
+].join(',');
+
+const isVisible = (element: Element) => {
+  const rect = element.getBoundingClientRect();
+  const style = getComputedStyle(element);
+  return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+};
+
+const getElementLabel = (element: Element) =>
+  element.getAttribute('aria-label')
+  ?? element.getAttribute('title')
+  ?? (element instanceof HTMLInputElement ? element.placeholder : '')
+  ?? element.textContent?.trim()
+  ?? '';
+
+const getInteractiveElements = () =>
+  Array.from(document.querySelectorAll(interactiveSelector))
+    .filter(isVisible)
+    .slice(0, 150)
+    .map((element, index) => {
+      const id = `bakbak-${index + 1}`;
+      element.setAttribute('data-bakbak-id', id);
+      return {
+        id,
+        role: element.getAttribute('role') ?? element.tagName.toLowerCase(),
+        label: getElementLabel(element).slice(0, 160),
+        type: element.getAttribute('type') ?? undefined,
+        href: element instanceof HTMLAnchorElement ? element.href : undefined,
+      };
+    });
+
 const encode = (audio: Uint8Array) => {
   let binary = '';
   for (const byte of audio) binary += String.fromCharCode(byte);
@@ -59,28 +116,96 @@ export async function executeWebsiteTool(
       };
     case 'get_selected_text':
       return { text: window.getSelection()?.toString() ?? '' };
+    case 'get_accessibility_tree':
+      return { accessibility_tree: JSON.stringify(getInteractiveElements()) };
+    case 'get_page_metadata':
+      return getWebsiteContext();
+    case 'click_element': {
+      const elementId = typeof args.element_id === 'string' ? args.element_id : '';
+      const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
+      if (!(element instanceof HTMLElement)) return { error: 'Element not found. Refresh the accessibility tree.' };
+      if (element.matches('button[type="submit"], input[type="submit"]')) {
+        return { error: 'Submitting forms by voice is not enabled.' };
+      }
+      element.click();
+      return { ok: true, element_id: elementId };
+    }
+    case 'fill_element': {
+      const elementId = typeof args.element_id === 'string' ? args.element_id : '';
+      const value = typeof args.value === 'string' ? args.value : '';
+      const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+        return { error: 'Element is not a text input. Refresh the accessibility tree.' };
+      }
+      element.value = value;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return { ok: true, element_id: elementId };
+    }
+    case 'scroll_page': {
+      const direction = args.direction === 'up' ? -1 : 1;
+      window.scrollBy({ top: direction * window.innerHeight * 0.8, behavior: 'smooth' });
+      return { ok: true, direction: direction < 0 ? 'up' : 'down' };
+    }
     default:
       return { error: `Website tool ${name} is not enabled`, args };
   }
 }
 
+export function getWebsiteContext(): WebsiteContext {
+  const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
+    .filter(isVisible)
+    .slice(0, 80)
+    .map((element) => ({ level: element.tagName.toLowerCase(), text: element.textContent?.trim().slice(0, 240) }));
+  const links = Array.from(document.querySelectorAll('a[href]'))
+    .filter(isVisible)
+    .slice(0, 100)
+    .map((element) => ({ text: element.textContent?.trim().slice(0, 160), url: (element as HTMLAnchorElement).href }));
+
+  return {
+    page_title: document.title || 'Untitled page',
+    page_url: location.href,
+    page_hostname: location.hostname,
+    page_language: document.documentElement.lang || navigator.language,
+    meta_description: document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
+    canonical_url: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? location.href,
+    page_content: document.body?.innerText.slice(0, 12000) ?? '',
+    page_headings: JSON.stringify(headings).slice(0, 6000),
+    page_links: JSON.stringify(links).slice(0, 8000),
+    accessibility_tree: JSON.stringify(getInteractiveElements()).slice(0, 12000),
+    selected_text: window.getSelection()?.toString().slice(0, 4000) ?? '',
+  };
+}
+
 export class VoiceClient {
   private socket?: WebSocket;
   private audio = new BrowserAudioInterface(16000);
+  private isReady = false;
+  private playbackEndsAt = 0;
 
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
-  async start() {
+  async start(context: WebsiteContext) {
     const { url, token } = socketUrl(await getSessionToken());
     this.callbacks.onState('connecting');
     this.socket = new WebSocket(url, ['bearer', token]);
-    this.socket.addEventListener('open', () => this.callbacks.onState('connected'));
     this.socket.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data)) as VoiceMessage;
+      if (message.type === 'context_required') {
+        this.socket?.send(JSON.stringify({ type: 'init', context }));
+      }
+      if (message.type === 'ready') {
+        this.isReady = true;
+        this.callbacks.onState('connected');
+      }
       if (message.audio_base64) {
+        const audio = decode(message.audio_base64);
+        const sampleRate = message.sample_rate ?? 16000;
+        const durationMs = (audio.byteLength / 2 / sampleRate) * 1000;
+        this.playbackEndsAt = Math.max(this.playbackEndsAt, performance.now()) + durationMs;
         void this.audio.output(
-          decode(message.audio_base64),
-          message.sample_rate ?? 16000,
+          audio,
+          sampleRate,
         );
       }
       this.callbacks.onMessage(message);
@@ -89,13 +214,16 @@ export class VoiceClient {
     this.socket.addEventListener('error', () => this.callbacks.onState('closed'));
 
     await this.audio.start(async (audio) => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
+      const agentAudioIsPlaying = performance.now() < this.playbackEndsAt + 300;
+      if (this.socket?.readyState === WebSocket.OPEN && this.isReady && !agentAudioIsPlaying) {
         this.socket.send(JSON.stringify({ type: 'audio', audio: encode(audio) }));
       }
     });
   }
 
   stop() {
+    this.isReady = false;
+    this.playbackEndsAt = 0;
     void this.audio.stop();
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ type: 'stop' }));

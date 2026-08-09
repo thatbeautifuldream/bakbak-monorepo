@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/16/solid';
 import type { ContentScriptContext } from '#imports';
 import { openLogin } from '@/lib/messages';
-import { executeWebsiteTool, VoiceClient } from '@/lib/voice-client';
+import { executeWebsiteTool, getWebsiteContext, VoiceClient } from '@/lib/voice-client';
 
 type VoiceState = 'idle' | 'connecting' | 'connected';
 
@@ -76,7 +76,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     });
     voiceRef.current = client;
     try {
-      await client.start();
+      await client.start(getWebsiteContext());
     } catch (cause) {
       client.stop();
       voiceRef.current = undefined;
