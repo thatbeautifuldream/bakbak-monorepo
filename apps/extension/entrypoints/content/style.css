@@ -192,7 +192,7 @@
 
 .notice {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   margin: 0 0 16px;
   border-radius: var(--bak-radius-inner);
@@ -201,6 +201,37 @@
   font-size: 13px;
   color: var(--bak-danger);
   text-wrap: pretty;
+}
+
+.notice-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-login {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  padding: 5px 7px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.notice-login:hover {
+  background: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.notice-login .icon {
+  width: 12px;
+  height: 12px;
 }
 
 /* Fields */

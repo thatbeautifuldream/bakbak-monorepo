@@ -1,9 +1,11 @@
+import { ApiError } from './api';
 import type { Plan, PlanRequest, SpeakRequest, Speech, Voices } from './api';
 
 export type Request =
   | { type: 'voices' }
   | { type: 'plan'; body: PlanRequest }
-  | { type: 'speak'; body: SpeakRequest };
+  | { type: 'speak'; body: SpeakRequest }
+  | { type: 'open-login' };
 
 export type Response<T> =
   | { ok: true; data: T }
@@ -13,7 +15,9 @@ type ResultFor<R extends Request> = R extends { type: 'voices' }
   ? Voices
   : R extends { type: 'plan' }
     ? Plan
-    : Speech;
+    : R extends { type: 'speak' }
+      ? Speech
+      : void;
 
 /** Content scripts run in the page's origin, so all API calls go via the worker. */
 export async function send<R extends Request>(
@@ -23,7 +27,9 @@ export async function send<R extends Request>(
     await browser.runtime.sendMessage(request);
 
   if (!response) throw new Error('Extension worker did not respond');
-  if (!response.ok) throw new Error(response.error);
+  if (!response.ok) throw new ApiError(response.error, response.status);
 
-  return response.data;
+  return response.data as ResultFor<R>;
 }
+
+export const openLogin = () => send({ type: 'open-login' });

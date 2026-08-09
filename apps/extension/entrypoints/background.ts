@@ -1,4 +1,5 @@
 import { ApiError, fetchVoices, planNarration, speakChunk } from '@/lib/api';
+import { WEB_URL } from '@/lib/config';
 import type { Request, Response } from '@/lib/messages';
 
 async function handle(request: Request) {
@@ -9,6 +10,8 @@ async function handle(request: Request) {
       return planNarration(request.body);
     case 'speak':
       return speakChunk(request.body);
+    case 'open-login':
+      return browser.tabs.create({ url: new URL('/login', WEB_URL).toString() });
   }
 }
 

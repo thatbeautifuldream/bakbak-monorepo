@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError } from './api';
 import type { Plan, PlanRequest, SpeakRequest } from './api';
 import { send } from './messages';
 
@@ -42,6 +43,7 @@ export function usePlayer(settings: VoiceSettings) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [requiresLogin, setRequiresLogin] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cacheRef = useRef(new Map<number, Promise<string>>());
@@ -133,7 +135,15 @@ export function usePlayer(settings: VoiceSettings) {
       } catch (cause) {
         // A pause() during an in-flight play() rejects; that isn't an error.
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        setError(cause instanceof Error ? cause.message : String(cause));
+        const needsLogin = cause instanceof ApiError && cause.status === 401;
+        setRequiresLogin(needsLogin);
+        setError(
+          needsLogin
+            ? 'Sign in to listen to this page.'
+            : cause instanceof Error
+              ? cause.message
+              : String(cause),
+        );
         setStatus('error');
       }
     },
@@ -153,6 +163,7 @@ export function usePlayer(settings: VoiceSettings) {
     async (body: PlanRequest) => {
       setStatus('preparing');
       setError(null);
+      setRequiresLogin(false);
       releaseCache();
       moveTo(0);
 
@@ -163,7 +174,15 @@ export function usePlayer(settings: VoiceSettings) {
         setStatus('ready');
         return next;
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        const needsLogin = cause instanceof ApiError && cause.status === 401;
+        setRequiresLogin(needsLogin);
+        setError(
+          needsLogin
+            ? 'Sign in to listen to this page.'
+            : cause instanceof Error
+              ? cause.message
+              : String(cause),
+        );
         setStatus('error');
         return null;
       }
@@ -211,6 +230,7 @@ export function usePlayer(settings: VoiceSettings) {
     moveTo(0);
     setStatus('idle');
     setError(null);
+    setRequiresLogin(false);
   }, [releaseCache, moveTo]);
 
   // A different voice invalidates every rendered chunk.
@@ -228,6 +248,7 @@ export function usePlayer(settings: VoiceSettings) {
     plan,
     index,
     error,
+    requiresLogin,
     progress,
     prepare,
     play,

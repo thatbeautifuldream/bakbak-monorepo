@@ -15,7 +15,7 @@ export default defineConfig({
     // user already has on the web app, so the extension needs no login of its own.
     // Both origins are needed: the cookie is stored against the web app, and
     // narration requests go to the API.
-    permissions: ['cookies', 'storage'],
+    permissions: ['cookies', 'storage', 'tabs'],
     host_permissions: ['http://localhost:3000/*', 'http://localhost:3001/*'],
   },
 });

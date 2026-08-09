@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
   ExclamationTriangleIcon,
   PauseIcon,
   PlayIcon,
@@ -11,7 +12,7 @@ import {
 import type { ContentScriptContext } from '#imports';
 import { extractArticle, selectedText } from '@/lib/article';
 import { usePlayer, type VoiceSettings } from '@/lib/use-player';
-import { send } from '@/lib/messages';
+import { openLogin, send } from '@/lib/messages';
 import type { Voices } from '@/lib/api';
 
 const CONTENT_TYPES = [
@@ -37,7 +38,17 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const panelRef = useRef<HTMLElement>(null);
 
   const player = usePlayer(settings);
-  const { status, plan, index, error, progress, prepare, reset, play } = player;
+  const {
+    status,
+    plan,
+    index,
+    error,
+    requiresLogin,
+    progress,
+    prepare,
+    reset,
+    play,
+  } = player;
   const isBusy = status === 'preparing';
 
   // `isolateEvents` stops key events at the shadow root, so Escape is handled
@@ -127,10 +138,20 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
         <div className="panel-body">
           {error ? (
-            <p className="notice" role="alert">
+            <div className="notice" role="alert">
               <ExclamationTriangleIcon className="icon" aria-hidden="true" />
-              <span>{error}</span>
-            </p>
+              <span className="notice-message">{error}</span>
+              {requiresLogin ? (
+                <button
+                  type="button"
+                  className="notice-login"
+                  onClick={() => void openLogin()}
+                >
+                  Login
+                  <ArrowTopRightOnSquareIcon className="icon" aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="field">
