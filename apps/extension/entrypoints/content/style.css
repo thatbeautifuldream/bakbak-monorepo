@@ -1,0 +1,228 @@
+/*
+ * Styles for the shadow-root content script UI.
+ *
+ * WXT injects this file into the shadow root (cssInjectionMode: 'ui') and
+ * rewrites `:root` to `:host`, so tokens declared here stay scoped to the UI
+ * and never leak into — or inherit from — the host page.
+ */
+
+:root {
+  --bak-radius: 16px;
+  --bak-padding: 8px;
+  --bak-radius-inner: calc(var(--bak-radius) - var(--bak-padding));
+
+  --bak-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+
+  --bak-surface: #ffffff;
+  --bak-surface-well: #fafafa;
+  --bak-text: #18181b;
+  --bak-text-muted: #71717a;
+  --bak-ring: 0 0 0 1px rgb(9 9 11 / 0.08);
+  --bak-shadow: 0 12px 32px -12px rgb(9 9 11 / 0.28),
+    0 4px 8px -4px rgb(9 9 11 / 0.12);
+  --bak-divider: rgb(9 9 11 / 0.08);
+  --bak-hover: rgb(9 9 11 / 0.05);
+
+  --bak-accent: #2563eb;
+  --bak-accent-hover: #1d4ed8;
+  --bak-accent-text: #ffffff;
+  --bak-focus: #3b82f6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bak-surface: #18181b;
+    --bak-surface-well: #27272a;
+    --bak-text: #fafafa;
+    --bak-text-muted: #a1a1aa;
+    --bak-ring: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    --bak-shadow: none;
+    --bak-divider: rgb(255 255 255 / 0.08);
+    --bak-hover: rgb(255 255 255 / 0.06);
+
+    --bak-accent: #3b82f6;
+    --bak-accent-hover: #60a5fa;
+    --bak-accent-text: #09090b;
+  }
+}
+
+.root {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  color-scheme: light dark;
+  font-family: var(--bak-font);
+  color: var(--bak-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.root :focus-visible {
+  outline: 2px solid var(--bak-focus);
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+/* Launcher */
+
+.launcher {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9999px;
+  background: var(--bak-surface);
+  box-shadow: var(--bak-ring), var(--bak-shadow);
+  color: var(--bak-text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.launcher:hover {
+  background: var(--bak-surface-well);
+}
+
+/* Panel */
+
+.panel {
+  display: flex;
+  width: 340px;
+  max-height: min(70vh, 520px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--bak-radius);
+  background: var(--bak-surface);
+  box-shadow: var(--bak-ring), var(--bak-shadow);
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--bak-divider);
+  padding: 12px 12px 12px 16px;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.panel-subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--bak-text-muted);
+  text-wrap: pretty;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--bak-divider);
+  padding: var(--bak-padding);
+}
+
+.footer-note {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-left: 8px;
+  font-size: 13px;
+  color: var(--bak-text-muted);
+}
+
+/* Page details */
+
+.details {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.detail-term {
+  font-size: 13px;
+  color: var(--bak-text-muted);
+}
+
+.detail-value {
+  margin: 2px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* Buttons */
+
+.button-primary,
+.button-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--bak-radius-inner);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.button-primary {
+  padding: 6px 12px 6px 8px;
+  background: var(--bak-accent);
+  color: var(--bak-accent-text);
+}
+
+.button-primary:hover {
+  background: var(--bak-accent-hover);
+}
+
+.button-ghost {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  background: none;
+  color: var(--bak-text-muted);
+  padding: 0;
+}
+
+.button-ghost:hover {
+  background: var(--bak-hover);
+  color: var(--bak-text);
+}
+
+@media (max-width: 420px) {
+  .root {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+  }
+
+  .panel {
+    width: auto;
+  }
+}

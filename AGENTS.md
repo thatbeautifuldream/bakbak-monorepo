@@ -24,7 +24,9 @@ After changing endpoints: `bun --filter api build && bun --filter @repo/api-clie
 
 ## Architecture
 
-Monorepo: **`apps/api/`** (Express REST API), **`apps/website/`** (Next.js 16 frontend), **`packages/api-client/`** (auto-generated type-safe SDK from OpenAPI spec via `@hey-api/openapi-ts`).
+Monorepo: **`apps/api/`** (Express REST API), **`apps/website/`** (Next.js 16 frontend), **`apps/extension/`** (WXT + React browser extension), **`packages/api-client/`** (auto-generated type-safe SDK from OpenAPI spec via `@hey-api/openapi-ts`).
+
+`apps/extension/` types come from `.wxt/` (generated). `wxt build`/`wxt` regenerate them, but `tsc` alone does not — that's why `typecheck` runs `wxt prepare` first.
 
 ```
 apps/api/src/
