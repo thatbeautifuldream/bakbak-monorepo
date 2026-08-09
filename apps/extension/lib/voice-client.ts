@@ -1,5 +1,6 @@
 import { BrowserAudioInterface } from 'sarvam-conv-ai-sdk/browser';
-import { API_URL, SESSION_COOKIE, WEB_URL } from './config';
+import { API_URL } from './config';
+import { send } from './messages';
 
 type VoiceMessage = {
   type: string;
@@ -37,9 +38,7 @@ const socketUrl = (token: string) => {
 };
 
 async function getSessionToken() {
-  const cookie = await browser.cookies.get({ url: WEB_URL, name: SESSION_COOKIE });
-  if (!cookie?.value) throw new Error(`Sign in at ${WEB_URL} to use voice chat`);
-  return cookie.value;
+  return send({ type: 'session-token' });
 }
 
 export type VoiceClientCallbacks = {

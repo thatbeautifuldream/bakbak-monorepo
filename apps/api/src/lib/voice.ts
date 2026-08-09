@@ -1,4 +1,5 @@
 import { ConversationAgent, InteractionType } from "sarvam-conv-ai-sdk";
+import type { AsyncAudioInterface } from "sarvam-conv-ai-sdk";
 import type { IncomingMessage, Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import { fromNodeHeaders } from "better-auth/node";
@@ -7,6 +8,13 @@ import { auth } from "../auth.js";
 type ClientMessage =
   | { type: "audio"; audio: string }
   | { type: "stop" };
+
+const serverAudioInterface: AsyncAudioInterface = {
+  start: async () => undefined,
+  stop: async () => undefined,
+  output: async () => undefined,
+  interrupt: () => undefined,
+};
 
 const getSessionToken = (request: IncomingMessage) => {
   const protocols = request.headers["sec-websocket-protocol"];
@@ -71,6 +79,7 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
       apiKey,
       config: getVoiceConfig(),
       platform: "node",
+      audioInterface: serverAudioInterface,
       audioCallback: async (message) => send(socket, message),
       textCallback: async (message) => send(socket, message),
       transcriptCallback: async (message) => send(socket, message),
