@@ -34,9 +34,7 @@
   "categories": [
     { "label": "News & media", "value": 73.1, "tone": "coral" },
     { "label": "Knowledge", "value": 9.5, "tone": "violet" },
-    { "label": "Work tools", "value": 7.2, "tone": "blue" },
-    { "label": "Video & audio", "value": 5.6, "tone": "amber" },
-    { "label": "Other", "value": 4.6, "tone": "graphite" }
+    { "label": "Other", "value": 17.4, "tone": "graphite" }
   ],
   "sites": [
     {

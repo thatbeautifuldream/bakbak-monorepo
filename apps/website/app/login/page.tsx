@@ -3,19 +3,36 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState, useTransition } from "react"
+import { RiArrowRightLine, RiGoogleFill, RiMicLine } from "@remixicon/react"
 import { signIn, signUp } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
-import { RiArrowRightLine, RiGoogleFill } from "@remixicon/react"
 
 type Mode = "signin" | "signup"
+
+function Brand() {
+  return (
+    <Link
+      href="/"
+      aria-label="BakBak home"
+      className="flex w-fit items-center gap-2.5"
+    >
+      <span className="grid size-8 place-items-center rounded-[10px] bg-[#e95f45] text-sm font-bold tracking-[-0.08em] text-[#fffaf2]">
+        b
+      </span>
+      <span className="text-base font-bold tracking-[-0.05em]">bakbak</span>
+    </Link>
+  )
+}
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [mode, setMode] = useState<Mode>("signin")
+  const [mode, setMode] = useState<Mode>(() =>
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  )
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -23,25 +40,33 @@ function LoginContent() {
   const [isPending, startTransition] = useTransition()
 
   const nextParam = searchParams.get("next")
-  const destination = nextParam && nextParam.startsWith("/") ? nextParam : "/dashboard"
+  const destination =
+    nextParam && nextParam.startsWith("/") ? nextParam : "/dashboard"
+  const isSignUp = mode === "signup"
 
   const switchMode = (newMode: Mode) => {
     setError(null)
     setMode(newMode)
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     setError(null)
 
     startTransition(async () => {
-      const result =
-        mode === "signup"
-          ? await signUp.email({ email, password, name, callbackURL: `${window.location.origin}${destination}` })
-          : await signIn.email({ email, password })
+      const result = isSignUp
+        ? await signUp.email({
+            email,
+            password,
+            name,
+            callbackURL: `${window.location.origin}${destination}`,
+          })
+        : await signIn.email({ email, password })
 
       if (result.error) {
-        setError(result.error.message ?? "Authentication failed.")
+        setError(
+          result.error.message ?? "We could not sign you in. Please try again."
+        )
         return
       }
 
@@ -58,48 +83,67 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-dvh">
-      <nav className="fixed top-0 z-50 w-full border-b bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
-            Forge
-          </Link>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="hidden sm:inline">
-              {mode === "signin" ? "New here?" : "Already have an account?"}
-            </span>
+    <main className="min-h-dvh bg-[#f7f3ed] text-[#171616] dark:bg-[#1f1c1a] dark:text-[#f8f1e8]">
+      <nav className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <Brand />
+          <p className="text-sm text-[#756e68] dark:text-[#c9c0b6]">
+            {isSignUp ? "Already a member?" : "New to BakBak?"}{" "}
             <button
               type="button"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-              onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
+              className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"
+              onClick={() => switchMode(isSignUp ? "signin" : "signup")}
             >
-              {mode === "signin" ? "Create one" : "Sign in"}
+              {isSignUp ? "Sign in" : "Create an account"}
             </button>
-          </div>
+          </p>
         </div>
       </nav>
 
-      <section className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pt-12 sm:px-6">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="relative mx-auto w-full max-w-sm">
-          <div className="rounded-xl border bg-card p-8">
-            <div className="mb-7">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {mode === "signin" ? "Welcome back" : "Create account"}
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Sign in to access the template dashboard.
+      <section className="mx-auto grid min-h-[calc(100dvh-5rem)] max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,0.7fr)] lg:gap-20">
+        <div className="hidden max-w-xl lg:block">
+          <p className="flex items-center gap-2 text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
+            <span className="size-2 rounded-full bg-[#e95f45] shadow-[0_0_0_5px_rgba(233,95,69,0.12)]" />
+            Your voice companion
+          </p>
+          <h1 className="mt-6 text-[clamp(3.5rem,6vw,5.75rem)] leading-[0.9] font-semibold tracking-[-0.08em]">
+            Take the web at your own pace.
+          </h1>
+          <p className="mt-7 max-w-md text-lg leading-7 text-[#5d5853] dark:text-[#c9c0b6]">
+            BakBak meets you on the page you are already reading. You decide
+            when the conversation begins.
+          </p>
+          <div className="mt-10 flex items-center gap-3 text-sm text-[#756e68] dark:text-[#c9c0b6]">
+            <span className="grid size-10 place-items-center rounded-full bg-[#e95f45]/12 text-[#b34d3b] dark:text-[#f39b87]">
+              <RiMicLine className="size-5" />
+            </span>
+            Mic starts only after you ask.
+          </div>
+        </div>
+
+        <div className="w-full max-w-md justify-self-center">
+          <div className="rounded-[1.75rem] border border-[#d8cfc4] bg-[#fffaf2] p-6 shadow-[0_28px_64px_-38px_rgba(23,22,22,0.5)] sm:p-8 dark:border-[#4c433e] dark:bg-[#302b28]">
+            <div className="lg:hidden">
+              <Brand />
+            </div>
+            <div className="mt-7 lg:mt-0">
+              <p className="text-[11px] font-bold tracking-[0.17em] text-[#b34d3b] uppercase dark:text-[#f39b87]">
+                {isSignUp ? "Join BakBak" : "Welcome back"}
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em]">
+                {isSignUp
+                  ? "A little more room to think."
+                  : "Pick up where you left off."}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-[#5d5853] dark:text-[#c9c0b6]">
+                {isSignUp
+                  ? "Create your account to start talking through the web."
+                  : "Sign in to return to your BakBak space."}
               </p>
             </div>
 
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-              {mode === "signup" && (
+            <form className="mt-7 flex flex-col gap-4" onSubmit={handleSubmit}>
+              {isSignUp ? (
                 <div className="grid gap-2">
                   <Label htmlFor="name">Name</Label>
                   <Input
@@ -107,11 +151,11 @@ function LoginContent() {
                     name="name"
                     placeholder="Your name"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(event) => setName(event.target.value)}
                     required
                   />
                 </div>
-              )}
+              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -120,7 +164,7 @@ function LoginContent() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                 />
               </div>
@@ -132,47 +176,57 @@ function LoginContent() {
                   type="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   required
                   minLength={8}
                 />
               </div>
-              {error && (
-                <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive dark:bg-destructive/15">
+              {error ? (
+                <p className="rounded-xl bg-[#e95f45]/10 px-3 py-2 text-sm text-[#b34d3b] dark:text-[#f39b87]">
                   {error}
                 </p>
-              )}
-              <Button type="submit" size="lg" className="mt-1 w-full" disabled={isPending}>
-                {isPending && <Spinner data-icon="inline-start" />}
-                {mode === "signin" ? "Sign in" : "Create account"}
+              ) : null}
+              <Button
+                type="submit"
+                size="xl"
+                className="mt-1 h-11 w-full rounded-xl border-[#e95f45] bg-[#e95f45] text-[#fffaf2] hover:bg-[#bf4633]"
+                disabled={isPending}
+              >
+                {isPending ? <Spinner data-icon="inline-start" /> : null}
+                {isSignUp ? "Create account" : "Sign in"}
                 <RiArrowRightLine className="size-4" />
               </Button>
             </form>
 
-            <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-              <div className="h-px flex-1 bg-border" />
+            <div className="my-5 flex items-center gap-3 text-xs text-[#756e68] dark:text-[#c9c0b6]">
+              <div className="h-px flex-1 bg-[#d8cfc4] dark:bg-[#4c433e]" />
               or
-              <div className="h-px flex-1 bg-border" />
+              <div className="h-px flex-1 bg-[#d8cfc4] dark:bg-[#4c433e]" />
             </div>
-            <Button variant="outline" size="lg" className="w-full" onClick={handleGoogle} type="button">
+            <Button
+              variant="outline"
+              size="xl"
+              className="h-11 w-full rounded-xl border-[#d8cfc4] bg-transparent hover:bg-[#eee8df] dark:border-[#4c433e] dark:hover:bg-[#24211f]"
+              onClick={handleGoogle}
+              type="button"
+            >
               <RiGoogleFill data-icon="inline-start" />
               Continue with Google
             </Button>
           </div>
-
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            {mode === "signin" ? "New here?" : "Already have an account?"}{" "}
+          <p className="mt-6 text-center text-sm text-[#756e68] dark:text-[#c9c0b6]">
+            {isSignUp ? "Already have an account?" : "New to BakBak?"}{" "}
             <button
               type="button"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-              onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
+              className="font-semibold text-[#b34d3b] underline-offset-4 hover:underline dark:text-[#f39b87]"
+              onClick={() => switchMode(isSignUp ? "signin" : "signup")}
             >
-              {mode === "signin" ? "Create one" : "Sign in"}
+              {isSignUp ? "Sign in" : "Create one"}
             </button>
           </p>
         </div>
       </section>
-    </div>
+    </main>
   )
 }
 

@@ -19,8 +19,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!session.data) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <Spinner />
+      <div className="flex min-h-dvh items-center justify-center bg-[#f7f3ed] dark:bg-[#1f1c1a]">
+        <div className="grid size-11 place-items-center rounded-2xl bg-[#e95f45] text-[#fffaf2] shadow-[0_14px_30px_-18px_#bf4633]">
+          <Spinner />
+        </div>
       </div>
     )
   }
@@ -36,7 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset className="bg-[#f7f3ed] dark:bg-[#1f1c1a]">
+        {children}
+      </SidebarInset>
     </SidebarProvider>
   )
 }

@@ -1,3 +1,5 @@
+import { SiteHeader } from "@/components/site-header"
+
 type Range = "1d"
 
 export type AnalyticsData = {
@@ -92,23 +94,7 @@ export default function AnalyticsDashboard({
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
-      <div className="border-b border-border/80">
-        <header className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-foreground text-xs font-bold tracking-tight text-background">
-              b
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight">
-                bakbak
-              </p>
-              <p className="hidden text-xs text-muted-foreground sm:block">
-                Signal desk
-              </p>
-            </div>
-          </div>
-        </header>
-      </div>
+      <SiteHeader />
 
       <section className="border-b border-border/80 bg-muted/25">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:px-6 sm:py-10 lg:flex-row lg:items-end lg:justify-between lg:px-8">

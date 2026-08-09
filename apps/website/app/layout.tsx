@@ -12,9 +12,17 @@ import "./globals.css"
 
 const openRunde = localFont({
   src: [
-    { path: "../fonts/OpenRunde-Regular.woff2", weight: "400", style: "normal" },
+    {
+      path: "../fonts/OpenRunde-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
     { path: "../fonts/OpenRunde-Medium.woff2", weight: "500", style: "normal" },
-    { path: "../fonts/OpenRunde-Semibold.woff2", weight: "600", style: "normal" },
+    {
+      path: "../fonts/OpenRunde-Semibold.woff2",
+      weight: "600",
+      style: "normal",
+    },
     { path: "../fonts/OpenRunde-Bold.woff2", weight: "700", style: "normal" },
   ],
   variable: "--font-sans",
@@ -32,20 +40,21 @@ export const viewport: Viewport = {
   maximumScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f3ed" },
+    { media: "(prefers-color-scheme: dark)", color: "#1f1c1a" },
   ],
 }
 
 export const metadata: Metadata = {
-  title: "Forge",
-  description: "A full-stack monorepo template",
+  title: "bakbak · Talk to the web",
+  description:
+    "A voice companion that helps you understand any page without leaving it.",
   manifest: "/manifest.json",
   formatDetection: { telephone: false },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Forge",
+    title: "bakbak",
   },
 }
 
@@ -58,7 +67,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", openRunde.variable)}
+      className={cn(
+        "antialiased",
+        fontMono.variable,
+        "font-sans",
+        openRunde.variable
+      )}
     >
       <body className={openRunde.className}>
         <NuqsAdapter>
