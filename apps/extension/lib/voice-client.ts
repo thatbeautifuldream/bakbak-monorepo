@@ -13,6 +13,7 @@ type VoiceMessage = {
   name?: string;
   tool_name?: string;
   request_id?: string;
+  session_id?: string;
   arguments?: Record<string, unknown>;
   parameters?: Record<string, unknown>;
 };
@@ -249,9 +250,10 @@ const decode = (value: string) => {
   return bytes;
 };
 
-const socketUrl = (token: string) => {
+const socketUrl = (token: string, resumeSessionId?: string) => {
   const url = new URL('/ws/voice', API_URL);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (resumeSessionId) url.searchParams.set('resume_session_id', resumeSessionId);
   return { url: url.toString(), token };
 };
 
@@ -563,6 +565,7 @@ export class VoiceClient {
   private isClosed = false;
   private isPaused = false;
   private context?: WebsiteContext;
+  private resumeSessionId?: string;
   private reconnectAttempt = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingAcknowledgement?: {
@@ -579,6 +582,7 @@ export class VoiceClient {
     this.isClosed = false;
     this.isPaused = false;
     this.isReady = false;
+    this.resumeSessionId = undefined;
     this.reconnectAttempt = 0;
     this.callbacks.onState('connecting');
     await this.connect();
@@ -586,7 +590,7 @@ export class VoiceClient {
   }
 
   private async connect() {
-    const { url, token } = socketUrl(await getSessionToken());
+    const { url, token } = socketUrl(await getSessionToken(), this.resumeSessionId);
     if (this.isClosed) return;
     const socket = new WebSocket(url, ['bearer', token]);
     this.socket = socket;
@@ -598,6 +602,7 @@ export class VoiceClient {
       }
       if (message.type === 'ready') {
         this.isReady = true;
+        if (typeof message.session_id === 'string') this.resumeSessionId = message.session_id;
         this.reconnectAttempt = 0;
         this.callbacks.onState('connected');
       }
@@ -752,6 +757,7 @@ export class VoiceClient {
     this.isReady = false;
     this.isPaused = false;
     this.context = undefined;
+    this.resumeSessionId = undefined;
     this.socket = undefined;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
