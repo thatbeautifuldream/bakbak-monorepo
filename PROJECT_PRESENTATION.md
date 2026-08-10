@@ -19,9 +19,9 @@ Bakbak is a browser extension that lets people talk to any webpage. Instead of l
 | Item | Details |
 | --- | --- |
 | GitHub repository | [github.com/thatbeautifuldream/bakbak-monorepo](https://github.com/thatbeautifuldream/bakbak-monorepo) |
-| Live deployment | _Add deployment URL_ |
-| Demo video (max. 3 minutes) | _Add demo-video URL_ |
-| Project presentation (PPT/PDF) | _Add PPT or PDF URL/file_ |
+| Live deployment | https://bakbak.milind.fyi/ |
+| Demo video (max. 3 minutes) | https://www.youtube.com/watch?v=8B5bvayecUE  |
+| Project presentation (PPT/PDF) | https://docs.google.com/presentation/d/17kgML2jneAO4WNiy7rYoZtj7M64NwryWkKyrr4y_oNM/edit?usp=sharing |
 
 ---
 
@@ -70,8 +70,3 @@ Bakbak keeps help on the page. It gives users a small voice companion they can o
 
 Bakbak makes the web easier to talk through: less searching, fewer tab switches, and more time spent understanding what is already in front of you.
 
-## Assets still needed
-
-- [ ] Live deployment URL
-- [ ] Demo video URL (up to 3 minutes)
-- [ ] Final PPT or PDF link/file
