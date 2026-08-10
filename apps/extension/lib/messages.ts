@@ -1,6 +1,12 @@
+import type { AnalyticsEvent } from "./analytics";
+
 export type Request =
   | { type: 'open-login' }
-  | { type: 'session-token' };
+  | { type: 'session-token' }
+  | { type: 'analytics-events'; events: AnalyticsEvent[] }
+  | { type: 'microphone-start'; captureId: string }
+  | { type: 'microphone-stop'; captureId: string }
+  | { type: 'microphone-audio'; captureId: string; audio: string };
 
 export type Response<T = void> =
   | { ok: true; data: T }
@@ -19,3 +25,12 @@ export async function send<R extends Request>(request: R): Promise<ResultFor<R>>
 }
 
 export const openLogin = () => send({ type: 'open-login' });
+
+export const recordAnalyticsEvents = (events: AnalyticsEvent[]) =>
+  send({ type: 'analytics-events', events });
+
+export const startMicrophoneCapture = (captureId: string) =>
+  send({ type: 'microphone-start', captureId });
+
+export const stopMicrophoneCapture = (captureId: string) =>
+  send({ type: 'microphone-stop', captureId });

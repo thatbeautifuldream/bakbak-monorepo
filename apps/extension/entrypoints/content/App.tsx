@@ -16,6 +16,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/16/solid";
 import type { ContentScriptContext } from "#imports";
+import { trackVoiceStarted } from "@/lib/analytics";
 import { openLogin } from "@/lib/messages";
 import {
   describeWebsiteTool,
@@ -184,6 +185,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const voiceRef = useRef<VoiceClient | undefined>(undefined);
   const entryId = useRef(0);
   const inactivityLanguage = useRef<InactivityLanguage>(languageFromBrowser());
+  const voiceStartTracked = useRef(false);
   const wasReconnecting = useRef(false);
   const levelListener = useRef<((level: number) => void) | undefined>(
     undefined,
@@ -346,6 +348,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     }
 
     setSeconds(0);
+    voiceStartTracked.current = false;
     let client: VoiceClient;
     client = new VoiceClient({
       onState: (state) => {
@@ -366,6 +369,10 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         if (state === "connected" && wasReconnecting.current) {
           wasReconnecting.current = false;
           append("action", "Reconnected. You can keep talking.");
+        }
+        if (state === "connected" && !voiceStartTracked.current) {
+          voiceStartTracked.current = true;
+          trackVoiceStarted();
         }
         setVoiceState(state);
       },

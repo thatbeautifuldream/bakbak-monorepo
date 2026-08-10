@@ -5,6 +5,8 @@ import {
   boolean,
   timestamp,
   index,
+  integer,
+  uuid,
 } from "drizzle-orm/pg-core";
 import {
   createInsertSchema,
@@ -105,3 +107,38 @@ export const verifications = pgTable("verification", {
 
 export const verificationSelectSchema = createSelectSchema(verifications);
 export const verificationInsertSchema = createInsertSchema(verifications);
+
+export const analyticsEvents = pgTable(
+  "analytics_event",
+  {
+    id: uuid("id").primaryKey(),
+    installationHash: text("installation_hash").notNull(),
+    visitId: uuid("visit_id").notNull(),
+    eventType: text("event_type").notNull(),
+    domain: text("domain").notNull(),
+    category: text("category").notNull(),
+    language: text("language").notNull(),
+    browser: text("browser").notNull(),
+    countryCode: text("country_code"),
+    regionCode: text("region_code"),
+    activeSeconds: integer("active_seconds").notNull().default(0),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("analytics_event_occurred_at_idx").on(table.occurredAt),
+    index("analytics_event_installation_occurred_at_idx").on(
+      table.installationHash,
+      table.occurredAt,
+    ),
+    index("analytics_event_domain_occurred_at_idx").on(
+      table.domain,
+      table.occurredAt,
+    ),
+  ],
+);
+
+export const analyticsEventSelectSchema = createSelectSchema(analyticsEvents);
+export const analyticsEventInsertSchema = createInsertSchema(analyticsEvents);

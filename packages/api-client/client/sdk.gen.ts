@@ -3,15 +3,24 @@
 import type { Client, Options as Options2, TDataShape } from "./client";
 import { client } from "./client.gen";
 import type {
+  GetV1AdminAnalyticsData,
+  GetV1AdminAnalyticsErrors,
+  GetV1AdminAnalyticsResponses,
   GetV1MeData,
   GetV1MeErrors,
   GetV1MeResponses,
+  HeadV1AdminAnalyticsData,
+  HeadV1AdminAnalyticsErrors,
+  HeadV1AdminAnalyticsResponses,
   HeadV1MeData,
   HeadV1MeErrors,
   HeadV1MeResponses,
   PatchV1MeData,
   PatchV1MeErrors,
   PatchV1MeResponses,
+  PostV1AnalyticsEventsData,
+  PostV1AnalyticsEventsErrors,
+  PostV1AnalyticsEventsResponses,
 } from "./types.gen";
 
 export type Options<
@@ -80,3 +89,52 @@ export const patchV1Me = <ThrowOnError extends boolean = false>(
       ...options?.headers,
     },
   });
+
+/**
+ * Store analytics events
+ *
+ * Stores a bounded batch of pseudonymous extension analytics events for the signed-in user.
+ */
+export const postV1AnalyticsEvents = <ThrowOnError extends boolean = false>(
+  options: Options<PostV1AnalyticsEventsData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    PostV1AnalyticsEventsResponses,
+    PostV1AnalyticsEventsErrors,
+    ThrowOnError
+  >({
+    url: "/v1/analytics/events",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get analytics dashboard data
+ *
+ * Returns aggregate extension activity for the selected rolling time range.
+ */
+export const getV1AdminAnalytics = <ThrowOnError extends boolean = false>(
+  options?: Options<GetV1AdminAnalyticsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    GetV1AdminAnalyticsResponses,
+    GetV1AdminAnalyticsErrors,
+    ThrowOnError
+  >({ url: "/v1/admin/analytics", ...options });
+
+/**
+ * Get analytics dashboard data
+ *
+ * Returns aggregate extension activity for the selected rolling time range.
+ */
+export const headV1AdminAnalytics = <ThrowOnError extends boolean = false>(
+  options?: Options<HeadV1AdminAnalyticsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).head<
+    HeadV1AdminAnalyticsResponses,
+    HeadV1AdminAnalyticsErrors,
+    ThrowOnError
+  >({ url: "/v1/admin/analytics", ...options });

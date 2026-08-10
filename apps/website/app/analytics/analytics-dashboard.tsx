@@ -1,43 +1,18 @@
-import { SiteHeader } from "@/components/site-header"
+"use client"
 
-type Range = "1d"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { getV1AdminAnalyticsOptions } from "@repo/api-client/react-query"
+import type { GetV1AdminAnalyticsResponse } from "@repo/api-client/types"
 
-export type AnalyticsData = {
-  range: Range
-  metrics: Array<{
-    label: string
-    value: string
-    detail: string
-    change: string
-  }>
-  chart: {
-    change: string
-    points: string
-    labels: string[]
-  }
-  categories: Array<{
-    label: string
-    value: number
-    tone: keyof typeof tones
-  }>
-  sites: Array<{
-    domain: string
-    language: string
-    visits: string
-    time: string
-    share: number
-    trend: string
-    tone: keyof typeof tones
-  }>
-  locations: Array<{
-    label: string
-    value: string
-  }>
-  browsers: Array<{
-    label: string
-    value: string
-  }>
-}
+type Range = "1d" | "7d" | "14d"
+export type AnalyticsData = GetV1AdminAnalyticsResponse["data"]
+
+const ranges: Array<{ value: Range; label: string }> = [
+  { value: "1d", label: "1 day" },
+  { value: "7d", label: "7 days" },
+  { value: "14d", label: "14 days" },
+]
 
 const tones = {
   coral: "bg-chart-1",
@@ -81,21 +56,43 @@ function CompactList({ items }: { items: AnalyticsData["locations"] }) {
   )
 }
 
-export default function AnalyticsDashboard({
-  initialData,
-}: {
-  initialData: AnalyticsData
-}) {
-  const data = initialData
+export default function AnalyticsDashboard() {
+  const [range, setRange] = useState<Range>("1d")
+  const { data, error, isPending, isFetching } = useQuery({
+    ...getV1AdminAnalyticsOptions({ query: { range } }),
+    select: (response) => response.data,
+    refetchInterval: 30_000,
+  })
+
+  if (isPending) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <p className="text-sm text-muted-foreground">Loading analytics…</p>
+      </section>
+    )
+  }
+
+  if (!data) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Analytics is unavailable
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {error instanceof Error ? error.message : "Admin access required."}
+        </p>
+      </section>
+    )
+  }
+
   const lastPoint = data.chart.points.split(" ").at(-1)?.split(",") ?? [
     "720",
     "33",
   ]
+  const hasActivity = data.metrics[0]?.value !== "0"
 
   return (
-    <main className="min-h-dvh bg-background text-foreground">
-      <SiteHeader />
-
+    <div className="text-foreground">
       <section className="border-b border-border/80 bg-muted/25">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:px-6 sm:py-10 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
@@ -106,6 +103,19 @@ export default function AnalyticsDashboard({
               A clear view of where the network spends time, how visits change,
               and which pages are ready for conversation.
             </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border bg-background p-1" aria-label="Analytics range">
+            {ranges.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setRange(item.value)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${range === item.value ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                aria-pressed={range === item.value}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
       </section>
@@ -125,8 +135,8 @@ export default function AnalyticsDashboard({
                 {metric.value}
               </p>
               <div className="mt-2 flex items-center gap-2 text-xs">
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                  ↑ {metric.change}
+                <span className={`font-semibold ${metric.change.startsWith("-") ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                  {metric.change.startsWith("+") ? "↑" : metric.change.startsWith("-") ? "↓" : ""} {metric.change}
                 </span>
                 <span className="text-muted-foreground">{metric.detail}</span>
               </div>
@@ -139,10 +149,10 @@ export default function AnalyticsDashboard({
             <div className="flex flex-col gap-2 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
               <div>
                 <h2 className="font-semibold tracking-tight">
-                  Visits gained momentum
+                  Visits over time
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Observed visits across all recognized websites
+                  Observed visits across recorded extension activity
                 </p>
               </div>
               <span className="w-fit rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
@@ -210,11 +220,15 @@ export default function AnalyticsDashboard({
                 {data.range.toUpperCase()}
               </span>
             </div>
-            <div className="mt-7 space-y-5">
-              {data.categories.map((category) => (
-                <ShareBar key={category.label} {...category} />
-              ))}
-            </div>
+            {data.categories.length > 0 ? (
+              <div className="mt-7 space-y-5">
+                {data.categories.map((category) => (
+                  <ShareBar key={category.label} {...category} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-7 text-sm text-muted-foreground">No activity recorded for this range.</p>
+            )}
           </article>
         </section>
 
@@ -223,12 +237,11 @@ export default function AnalyticsDashboard({
             <div className="flex flex-col gap-2 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
               <div>
                 <h2 className="font-semibold tracking-tight">
-                  Indian language publishers
+                  Most visited websites
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Top publisher sites by observed visits. Shares use the total
-                  above and are rounded; trends compare with the prior
-                  equivalent period.
+                  Sites are ranked by observed visits. Shares are rounded;
+                  trends compare with the prior equivalent period.
                 </p>
               </div>
               <span className="text-xs text-muted-foreground">
@@ -287,11 +300,18 @@ export default function AnalyticsDashboard({
                       <td className="px-4 py-4 text-right text-muted-foreground tabular-nums">
                         {site.share}%
                       </td>
-                      <td className="px-5 py-4 text-right font-semibold text-emerald-700 tabular-nums sm:px-6 dark:text-emerald-400">
-                        ↑ {site.trend.replace("+", "")}
+                      <td className={`px-5 py-4 text-right font-semibold tabular-nums sm:px-6 ${site.trend.startsWith("-") ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                        {site.trend.startsWith("+") ? "↑ " : site.trend.startsWith("-") ? "↓ " : ""}{site.trend.replace("+", "").replace("-", "")}
                       </td>
                     </tr>
                   ))}
+                  {data.sites.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-12 text-center text-muted-foreground sm:px-6">
+                        No visits recorded for this range yet.
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -310,10 +330,10 @@ export default function AnalyticsDashboard({
                 </p>
               </div>
               <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                4 states + outside India
+                {data.locations.length > 0 ? `${data.locations.length} location groups` : "No data"}
               </span>
             </div>
-            <CompactList items={data.locations} />
+            {data.locations.length > 0 ? <CompactList items={data.locations} /> : <p className="text-sm text-muted-foreground">No location data recorded yet.</p>}
           </article>
 
           <article className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
@@ -330,14 +350,14 @@ export default function AnalyticsDashboard({
                 Desktop
               </span>
             </div>
-            <CompactList items={data.browsers} />
+            {data.browsers.length > 0 ? <CompactList items={data.browsers} /> : <p className="text-sm text-muted-foreground">No browser data recorded yet.</p>}
           </article>
         </section>
 
         <footer className="mt-10 border-t pt-5 text-xs leading-5 text-muted-foreground">
-          Aggregate metrics only · No individual visitor records displayed
+          {isFetching ? "Refreshing data…" : hasActivity ? `Updated ${new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}` : "Waiting for extension activity"} · Aggregate metrics only · No individual visitor records displayed
         </footer>
       </div>
-    </main>
+    </div>
   )
 }

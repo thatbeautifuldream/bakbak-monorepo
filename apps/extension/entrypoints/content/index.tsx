@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './style.css';
+import { startPageAnalyticsTracking } from '@/lib/analytics';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -8,6 +9,10 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
 
   async main(ctx) {
+    let analyticsTracker = startPageAnalyticsTracking();
+    ctx.addEventListener(window, 'wxt:locationchange', () => {
+      analyticsTracker = startPageAnalyticsTracking();
+    });
     const ui = await createShadowRootUi(ctx, {
       name: 'bakbak-ui',
       position: 'inline',
@@ -19,6 +24,7 @@ export default defineContentScript({
         return root;
       },
       onRemove: (root) => {
+        analyticsTracker?.stop();
         root?.unmount();
       },
     });

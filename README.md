@@ -184,6 +184,7 @@ bun run db:migrate
 | `SARVAM_ORG_ID` | Yes for voice | Sarvam organization ID |
 | `SARVAM_WORKSPACE_ID` | Yes for voice | Sarvam workspace ID |
 | `SARVAM_TOOL_SECRET` | Yes for browser tools | Bearer secret configured on Sarvam API tools |
+| `ANALYTICS_HASH_SECRET` | Yes for analytics | Secret used to pseudonymise extension installations |
 
 ### Website (`apps/website/.env`)
 

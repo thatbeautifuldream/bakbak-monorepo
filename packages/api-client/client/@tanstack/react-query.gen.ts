@@ -3,14 +3,26 @@
 import { queryOptions, type UseMutationOptions } from "@tanstack/react-query";
 
 import { client } from "../client.gen";
-import { getV1Me, type Options, patchV1Me } from "../sdk.gen";
+import {
+  getV1AdminAnalytics,
+  getV1Me,
+  type Options,
+  patchV1Me,
+  postV1AnalyticsEvents,
+} from "../sdk.gen";
 import type {
+  GetV1AdminAnalyticsData,
+  GetV1AdminAnalyticsError,
+  GetV1AdminAnalyticsResponse,
   GetV1MeData,
   GetV1MeError,
   GetV1MeResponse,
   PatchV1MeData,
   PatchV1MeError,
   PatchV1MeResponse,
+  PostV1AnalyticsEventsData,
+  PostV1AnalyticsEventsError,
+  PostV1AnalyticsEventsResponse,
 } from "../types.gen";
 
 export type QueryKey<TOptions extends Options> = [
@@ -108,3 +120,62 @@ export const patchV1MeMutation = (
   };
   return mutationOptions;
 };
+
+/**
+ * Store analytics events
+ *
+ * Stores a bounded batch of pseudonymous extension analytics events for the signed-in user.
+ */
+export const postV1AnalyticsEventsMutation = (
+  options?: Partial<Options<PostV1AnalyticsEventsData>>,
+): UseMutationOptions<
+  PostV1AnalyticsEventsResponse,
+  PostV1AnalyticsEventsError,
+  Options<PostV1AnalyticsEventsData>
+> => {
+  const mutationOptions: UseMutationOptions<
+    PostV1AnalyticsEventsResponse,
+    PostV1AnalyticsEventsError,
+    Options<PostV1AnalyticsEventsData>
+  > = {
+    mutationFn: async (fnOptions) => {
+      const { data } = await postV1AnalyticsEvents({
+        ...options,
+        ...fnOptions,
+        throwOnError: true,
+      });
+      return data;
+    },
+  };
+  return mutationOptions;
+};
+
+export const getV1AdminAnalyticsQueryKey = (
+  options?: Options<GetV1AdminAnalyticsData>,
+) => createQueryKey("getV1AdminAnalytics", options);
+
+/**
+ * Get analytics dashboard data
+ *
+ * Returns aggregate extension activity for the selected rolling time range.
+ */
+export const getV1AdminAnalyticsOptions = (
+  options?: Options<GetV1AdminAnalyticsData>,
+) =>
+  queryOptions<
+    GetV1AdminAnalyticsResponse,
+    GetV1AdminAnalyticsError,
+    GetV1AdminAnalyticsResponse,
+    ReturnType<typeof getV1AdminAnalyticsQueryKey>
+  >({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await getV1AdminAnalytics({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      });
+      return data;
+    },
+    queryKey: getV1AdminAnalyticsQueryKey(options),
+  });
