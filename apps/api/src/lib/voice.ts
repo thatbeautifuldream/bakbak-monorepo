@@ -1,11 +1,15 @@
 import { ConversationAgent, InteractionType } from "sarvam-conv-ai-sdk";
 import type { AsyncAudioInterface } from "sarvam-conv-ai-sdk";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, Server } from "node:http";
+import type { RequestHandler } from "express";
 import { WebSocket, WebSocketServer } from "ws";
+import { z } from "zod";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../auth.js";
+import { BrowserToolBridge, BrowserToolBridgeError } from "./browser-tool-bridge.js";
 
-type ClientMessage =
+export type VoiceClientMessage =
   | {
       type: "init";
       context: {
@@ -23,8 +27,70 @@ type ClientMessage =
       };
     }
   | { type: "audio"; audio: string }
+  | { type: "pause" }
+  | { type: "resume" }
+  | { type: "end" }
   | { type: "stop" }
-  | { type: "tool_result"; name: string; result: unknown };
+  | {
+      type: "tool_result";
+      request_id?: string;
+      name: string;
+      result: unknown;
+    };
+
+const browserToolNames = [
+  "browser_action",
+  "get_page_context",
+  "get_selected_text",
+  "get_accessibility_tree",
+  "get_page_metadata",
+  "get_page_sections",
+  "click_element",
+  "fill_element",
+  "scroll_page",
+  "focus_elements",
+  "navigate_to_page",
+  "go_back",
+] as const;
+
+const browserToolArgumentsSchema = z.union([
+  z.record(z.string(), z.unknown()),
+  z.string().transform((value, context) => {
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        context.addIssue({ code: "custom", message: "Arguments must be an object" });
+        return z.NEVER;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      context.addIssue({ code: "custom", message: "Arguments must be valid JSON" });
+      return z.NEVER;
+    }
+  }),
+]);
+
+export const browserToolRequestSchema = z
+  .object({
+    session_id: z.string().uuid(),
+    tool_name: z.enum(browserToolNames),
+    action: z.string().optional(),
+    arguments: browserToolArgumentsSchema.optional(),
+  })
+  .passthrough()
+  .transform(({ action, arguments: arguments_, session_id, tool_name, ...parameters }) => ({
+    session_id,
+    tool_name,
+    arguments: { ...parameters, ...arguments_, ...(action ? { action } : {}) },
+  }));
+
+const browserToolBridge = new BrowserToolBridge();
+
+const logBrowserTool = (event: string, details: Record<string, unknown>) => {
+  if (process.env.NODE_ENV !== "production") {
+    console.info(`[Browser tool] ${event}`, details);
+  }
+};
 
 const serverAudioInterface: AsyncAudioInterface = {
   start: async () => undefined,
@@ -70,7 +136,7 @@ const waitForContext = (socket: WebSocket) =>
     socket.once("message", (raw) => {
       clearTimeout(timeout);
       try {
-        const message = JSON.parse(raw.toString()) as ClientMessage;
+        const message = JSON.parse(raw.toString()) as VoiceClientMessage;
         if (message.type !== "init") throw new Error("Page context is required");
         resolve(message.context);
       } catch (error) {
@@ -79,13 +145,166 @@ const waitForContext = (socket: WebSocket) =>
     });
   });
 
-const send = (socket: WebSocket, message: unknown) => {
+type VoiceSocket = Pick<WebSocket, "close" | "readyState" | "send">;
+
+type VoiceAgent = Pick<
+  ConversationAgent,
+  "mute" | "sendAudio" | "stop" | "unmute"
+>;
+
+type VoiceSessionOptions = {
+  agent: VoiceAgent;
+  onCleanup: () => void;
+  onToolResult: (message: Extract<VoiceClientMessage, { type: "tool_result" }>) => void;
+  socket: VoiceSocket;
+};
+
+const send = (socket: VoiceSocket, message: unknown) => {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 };
 
-const endInteraction = (socket: WebSocket) => {
-  send(socket, { type: "server.action.interaction_end" });
-  socket.close(1000, "Voice agent ended the conversation");
+export const createVoiceSession = ({
+  agent,
+  onCleanup,
+  onToolResult,
+  socket,
+}: VoiceSessionOptions) => {
+  let ended = false;
+  let paused = false;
+
+  const finish = async (notifyClient: boolean) => {
+    if (ended) return;
+    ended = true;
+    onCleanup();
+    if (notifyClient) send(socket, { type: "server.action.interaction_end" });
+    if (socket.readyState === WebSocket.OPEN) socket.close(1000);
+    await agent.stop().catch(() => undefined);
+  };
+
+  return {
+    close: () => finish(false),
+    endByAgent: () => finish(true),
+    handleMessage: async (message: VoiceClientMessage) => {
+      if (message.type === "pause") {
+        if (!paused && !ended) {
+          await agent.mute();
+          paused = true;
+        }
+        if (!ended) send(socket, { type: "paused" });
+        return;
+      }
+
+      if (message.type === "resume") {
+        if (paused && !ended) {
+          await agent.unmute();
+          paused = false;
+        }
+        if (!ended) send(socket, { type: "resumed" });
+        return;
+      }
+
+      if (message.type === "end" || message.type === "stop") {
+        await finish(true);
+        return;
+      }
+
+      if (message.type === "audio" && !paused && !ended) {
+        await agent.sendAudio(Buffer.from(message.audio, "base64"));
+        return;
+      }
+
+      if (message.type === "tool_result" && !ended) onToolResult(message);
+    },
+  };
+};
+
+const forwardTranscriptionsWithoutSdkWarning = (
+  agent: ConversationAgent,
+  socket: WebSocket,
+) => {
+  const internalAgent = agent as unknown as {
+    agent: { routeMessage: (message: unknown) => Promise<void> };
+  };
+  const routeMessage = internalAgent.agent.routeMessage.bind(internalAgent.agent);
+
+  internalAgent.agent.routeMessage = async (message) => {
+    if (
+      typeof message === "object" &&
+      message !== null &&
+      "type" in message &&
+      message.type === "server.event.transcription"
+    ) {
+      send(socket, message);
+      return;
+    }
+    await routeMessage(message);
+  };
+};
+
+const hasToolAuthorization = (authorization: string | undefined, secret: string) => {
+  if (!authorization) return false;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(authorization);
+  return expected.length === received.length && timingSafeEqual(expected, received);
+};
+
+export const browserToolRequestHandler: RequestHandler = async (request, response) => {
+  const secret = process.env.SARVAM_TOOL_SECRET;
+  if (!secret) {
+    response.status(503).json({ error: "Browser tools are not configured" });
+    return;
+  }
+  if (!hasToolAuthorization(request.header("authorization"), secret)) {
+    response.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = browserToolRequestSchema.safeParse(request.body);
+  if (!parsed.success) {
+    const requestShape =
+      request.body && typeof request.body === "object" && !Array.isArray(request.body)
+        ? Object.fromEntries(
+            Object.entries(request.body).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? "array" : typeof value,
+            ]),
+          )
+        : { body: typeof request.body };
+    logBrowserTool("invalid request", {
+      fields: requestShape,
+      issues: parsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message })),
+    });
+    response.status(400).json({ error: "Invalid browser tool request" });
+    return;
+  }
+
+  logBrowserTool("received", {
+    tool: parsed.data.tool_name,
+    action: parsed.data.arguments.action,
+  });
+
+  try {
+    const result = await browserToolBridge.request(
+      parsed.data.session_id,
+      parsed.data.tool_name,
+      parsed.data.arguments,
+    );
+    logBrowserTool("completed", {
+      tool: parsed.data.tool_name,
+      action: parsed.data.arguments.action,
+      result,
+    });
+    response.status(200).json({ result });
+  } catch (error) {
+    if (!(error instanceof BrowserToolBridgeError)) {
+      response.status(500).json({ error: "Unable to execute browser tool" });
+      return;
+    }
+
+    const status = error.code === "session_not_found" ? 404 : 504;
+    logBrowserTool("failed", { tool: parsed.data.tool_name, code: error.code });
+    response.status(status).json({ error: error.code });
+  }
 };
 
 const authenticate = async (request: IncomingMessage) => {
@@ -115,25 +334,60 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
   }
 
   let agent: ConversationAgent;
+  let browserSessionId: string | undefined;
+  let session: ReturnType<typeof createVoiceSession> | undefined;
   try {
     const contextPromise = waitForContext(socket);
     send(socket, { type: "context_required" });
     const agentVariables = await contextPromise;
+    browserSessionId = randomUUID();
+    browserToolBridge.register(browserSessionId, (call) => {
+      logBrowserTool("forwarded to extension", { tool: call.name, action: call.arguments.action });
+      send(socket, {
+        type: "browser_tool_call",
+        request_id: call.requestId,
+        name: call.name,
+        arguments: call.arguments,
+      });
+    });
     agent = new ConversationAgent({
       apiKey,
-      config: getVoiceConfig(agentVariables),
+      config: getVoiceConfig({ ...agentVariables, voice_session_id: browserSessionId }),
       platform: "node",
       audioInterface: serverAudioInterface,
       audioCallback: async (message) => send(socket, message),
       textCallback: async (message) => send(socket, message),
       transcriptCallback: async (message) => send(socket, message),
       eventCallback: async (event) => send(socket, event),
-      endCallback: async () => endInteraction(socket),
+      endCallback: async () => session?.endByAgent(),
+    });
+    forwardTranscriptionsWithoutSdkWarning(agent, socket);
+    session = createVoiceSession({
+      agent,
+      socket,
+      onCleanup: () => {
+        if (browserSessionId) browserToolBridge.unregister(browserSessionId);
+      },
+      onToolResult: (message) => {
+        if (!browserSessionId || !message.request_id) return;
+        const resolved = browserToolBridge.resolve(
+          browserSessionId,
+          message.request_id,
+          message.name,
+          message.result,
+        );
+        logBrowserTool("extension result", {
+          tool: message.name,
+          resolved,
+          result: message.result,
+        });
+      },
     });
 
     await agent.start();
     if (!(await agent.waitForConnect(10))) {
-      socket.close(1011, "Voice agent connection timed out");
+      send(socket, { type: "error", message: "Voice agent connection timed out" });
+      await session.close();
       return;
     }
     send(socket, { type: "ready" });
@@ -142,30 +396,28 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
       type: "error",
       message: error instanceof Error ? error.message : String(error),
     });
+    await session?.close();
+    if (!session && browserSessionId) browserToolBridge.unregister(browserSessionId);
     socket.close(1011, "Unable to start voice agent");
     return;
   }
 
   socket.on("message", async (raw) => {
     try {
-      const message = JSON.parse(raw.toString()) as ClientMessage;
-      if (message.type === "stop") {
-        await agent.stop();
-        socket.close(1000);
-        return;
-      }
-      if (message.type === "audio" && typeof message.audio === "string") {
-        await agent.sendAudio(Buffer.from(message.audio, "base64"));
-      }
+      const message = JSON.parse(raw.toString()) as VoiceClientMessage;
+      await session?.handleMessage(message);
     } catch (error) {
       send(socket, {
         type: "error",
         message: error instanceof Error ? error.message : String(error),
       });
+      void session?.close();
     }
   });
 
-  socket.on("close", () => void agent.stop().catch(() => undefined));
+  socket.on("close", () => {
+    void session?.close();
+  });
 };
 
 export const attachVoiceWebSocket = (server: Server) => {
