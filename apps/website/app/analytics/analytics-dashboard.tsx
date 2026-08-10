@@ -56,6 +56,108 @@ function CompactList({ items }: { items: AnalyticsData["locations"] }) {
   )
 }
 
+const formatConversations = (count: number) =>
+  `${count} conversation${count === 1 ? "" : "s"}`
+
+const localHour = (utcHour: number) => {
+  const reference = new Date()
+  reference.setUTCHours(utcHour, 0, 0, 0)
+
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hourCycle: "h23",
+    })
+      .formatToParts(reference)
+      .find((part) => part.type === "hour")?.value ?? utcHour,
+  )
+}
+
+const formatHour = (utcHour: number) => {
+  const reference = new Date()
+  reference.setUTCHours(utcHour, 0, 0, 0)
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(reference)
+}
+
+function ActivityByHourChart({
+  activityByHour,
+}: {
+  activityByHour: AnalyticsData["activityByHour"]
+}) {
+  const hours = [...activityByHour].sort(
+    (left, right) => localHour(left.hour) - localHour(right.hour),
+  )
+  const peak = hours.reduce(
+    (current, hour) =>
+      hour.conversations > current.conversations ? hour : current,
+    hours[0],
+  )
+  const maxConversations = Math.max(...hours.map((hour) => hour.conversations), 1)
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  return (
+    <article className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-semibold tracking-tight">When Bakbak is used</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Voice conversations started by hour · {timeZone || "your local time"}
+          </p>
+        </div>
+        {peak?.conversations ? (
+          <span className="w-fit rounded-full bg-chart-1/10 px-2.5 py-1 text-xs font-semibold text-chart-1">
+            Peak {formatHour(peak.hour)}
+          </span>
+        ) : null}
+      </div>
+
+      {peak?.conversations ? (
+        <>
+          <div
+            className="mt-7 grid h-36 grid-cols-24 items-end gap-px sm:h-44 sm:gap-1"
+            role="img"
+            aria-label={`Voice conversations started by hour. The busiest hour starts at ${formatHour(peak.hour)} with ${formatConversations(peak.conversations)}.`}
+          >
+            {hours.map((hour) => (
+              <div
+                key={hour.hour}
+                className="group flex h-full items-end rounded-sm"
+                title={`${formatHour(hour.hour)}: ${formatConversations(hour.conversations)}`}
+                aria-hidden="true"
+              >
+                <span
+                  className="w-full rounded-sm bg-chart-1/80 transition-colors group-hover:bg-chart-1"
+                  style={{
+                    height: `${Math.max((hour.conversations / maxConversations) * 100, 2)}%`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-4 text-xs text-muted-foreground">
+            {hours.filter((_, index) => index % 6 === 0).map((hour, index) => (
+              <span
+                key={hour.hour}
+                className={index === 3 ? "text-right" : index === 2 ? "text-center" : ""}
+              >
+                {formatHour(hour.hour)}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-7 text-sm text-muted-foreground">
+          No voice conversations recorded for this range yet.
+        </p>
+      )}
+    </article>
+  )
+}
+
 export default function AnalyticsDashboard() {
   const [range, setRange] = useState<Range>("1d")
   const { data, error, isPending, isFetching } = useQuery({
@@ -318,7 +420,7 @@ export default function AnalyticsDashboard() {
           </article>
         </section>
 
-        <section className="mt-8 grid gap-8 md:grid-cols-2">
+        <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)]">
           <article className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
@@ -336,22 +438,7 @@ export default function AnalyticsDashboard() {
             {data.locations.length > 0 ? <CompactList items={data.locations} /> : <p className="text-sm text-muted-foreground">No location data recorded yet.</p>}
           </article>
 
-          <article className="rounded-2xl border bg-card p-5 shadow-xs sm:p-6">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-semibold tracking-tight">
-                  Browser landscape
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Share of active extensions by browser
-                </p>
-              </div>
-              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                Desktop
-              </span>
-            </div>
-            {data.browsers.length > 0 ? <CompactList items={data.browsers} /> : <p className="text-sm text-muted-foreground">No browser data recorded yet.</p>}
-          </article>
+          <ActivityByHourChart activityByHour={data.activityByHour} />
         </section>
 
         <footer className="mt-10 border-t pt-5 text-xs leading-5 text-muted-foreground">

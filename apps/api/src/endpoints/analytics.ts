@@ -78,7 +78,12 @@ const analyticsSnapshotSchema = z.object({
     }),
   ),
   locations: z.array(z.object({ label: z.string(), value: z.string() })),
-  browsers: z.array(z.object({ label: z.string(), value: z.string() })),
+  activityByHour: z.array(
+    z.object({
+      hour: z.number().int().min(0).max(23),
+      conversations: z.number().int().nonnegative(),
+    }),
+  ),
 });
 
 const locationFromRequest = (request: { header: (name: string) => string | undefined }) => {

@@ -82,10 +82,10 @@ describe("buildAnalyticsSnapshot", () => {
         { label: "Outside India", value: "50%" },
       ]),
     );
-    expect(snapshot.browsers).toEqual(
+    expect(snapshot.activityByHour).toEqual(
       expect.arrayContaining([
-        { label: "Chrome", value: "50%" },
-        { label: "Firefox", value: "50%" },
+        { hour: 10, conversations: 0 },
+        { hour: 11, conversations: 1 },
       ]),
     );
   });

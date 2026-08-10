@@ -241,9 +241,9 @@ export type GetV1AdminAnalyticsResponses = {
         label: string;
         value: string;
       }>;
-      browsers: Array<{
-        label: string;
-        value: string;
+      activityByHour: Array<{
+        hour: number;
+        conversations: number;
       }>;
     };
   };

@@ -104,9 +104,9 @@ export type AnalyticsSnapshot = {
     label: string;
     value: string;
   }>;
-  browsers: Array<{
-    label: string;
-    value: string;
+  activityByHour: Array<{
+    hour: number;
+    conversations: number;
   }>;
 };
 
@@ -247,6 +247,20 @@ const getTrend = (
   return { points, labels };
 };
 
+const getActivityByHour = (events: AnalyticsEventRecord[]) => {
+  const conversations = Array.from({ length: 24 }, () => 0);
+
+  for (const event of events) {
+    if (event.eventType !== "voice_started") continue;
+    conversations[event.occurredAt.getUTCHours()] += 1;
+  }
+
+  return conversations.map((count, hour) => ({
+    hour,
+    conversations: count,
+  }));
+};
+
 const getLatestByInstallation = (events: AnalyticsEventRecord[]) => {
   const latest = new Map<string, AnalyticsEventRecord>();
   for (const event of events) {
@@ -354,11 +368,9 @@ export const buildAnalyticsSnapshot = (
     }));
 
   const locationCounts = new Map<string, number>();
-  const browserCounts = new Map<string, number>();
   for (const event of getLatestByInstallation(current)) {
     const location = getLocationLabel(event);
     locationCounts.set(location, (locationCounts.get(location) ?? 0) + 1);
-    browserCounts.set(event.browser, (browserCounts.get(event.browser) ?? 0) + 1);
   }
   const formatDistribution = (counts: Map<string, number>) =>
     [...counts.entries()]
@@ -408,6 +420,6 @@ export const buildAnalyticsSnapshot = (
     categories,
     sites,
     locations: formatDistribution(locationCounts),
-    browsers: formatDistribution(browserCounts),
+    activityByHour: getActivityByHour(current),
   };
 };
