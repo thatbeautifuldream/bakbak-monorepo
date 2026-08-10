@@ -22,6 +22,8 @@ import {
   executeWebsiteTool,
   getWebsiteContext,
   getWebsiteSafety,
+  translationEvent,
+  type TranslationView,
   VoiceClient,
 } from "@/lib/voice-client";
 
@@ -166,6 +168,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isTucked, setIsTucked] = useState(false);
   const [title, setTitle] = useState(() => document.title || "Untitled page");
   const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
+  const [translation, setTranslation] = useState<TranslationView | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [seconds, setSeconds] = useState(0);
@@ -221,6 +224,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     ctx.addEventListener(window, "wxt:locationchange", () => {
       setTitle(document.title || "Untitled page");
       setWebsiteSafety(getWebsiteSafety());
+      setTranslation(null);
       setEntries([]);
       setError(null);
       voiceRef.current?.end();
@@ -231,6 +235,16 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   }, [ctx]);
 
   useEffect(() => () => voiceRef.current?.end(), []);
+
+  useEffect(() => {
+    const showTranslation = (event: Event) => {
+      const detail = (event as CustomEvent<TranslationView>).detail;
+      if (!detail?.originalText || !detail.translatedText || !detail.targetLanguage) return;
+      setTranslation(detail);
+    };
+    window.addEventListener(translationEvent, showTranslation);
+    return () => window.removeEventListener(translationEvent, showTranslation);
+  }, []);
 
   useEffect(() => {
     void browser.storage.local
@@ -447,6 +461,22 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           <span className="scope-host">{hostname}</span>
           {websiteSafety.isSensitive ? <span className="scope-safe">Read-only</span> : null}
         </div>
+
+        {translation ? (
+          <section className="translation" aria-live="polite">
+            <div>
+              <p className="translation-label">Original</p>
+              <p>{translation.originalText}</p>
+            </div>
+            <div>
+              <p className="translation-label">{translation.targetLanguage}</p>
+              <p>{translation.translatedText}</p>
+            </div>
+            <button className="button-ghost translation-close" type="button" onClick={() => setTranslation(null)} aria-label="Close translation">
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
+          </section>
+        ) : null}
 
         {entries.length === 0 ? (
           <div className="empty">

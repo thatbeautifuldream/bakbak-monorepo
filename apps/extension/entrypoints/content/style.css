@@ -290,6 +290,40 @@
   text-transform: uppercase;
 }
 
+.translation {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  border-bottom: 1px solid var(--bak-border);
+  padding: 12px 42px 12px 14px;
+}
+
+.translation > div {
+  display: grid;
+  gap: 2px;
+}
+
+.translation p {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 18px;
+}
+
+.translation-label {
+  color: var(--bak-muted);
+  font-family: var(--bak-font-mono);
+  font-size: 0.625rem !important;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.translation-close {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+}
+
 /* Log */
 
 .empty,

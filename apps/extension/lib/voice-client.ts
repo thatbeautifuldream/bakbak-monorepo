@@ -36,6 +36,14 @@ export type WebsiteSafety = {
   reason?: "financial" | "identity" | "credential";
 };
 
+export type TranslationView = {
+  originalText: string;
+  translatedText: string;
+  targetLanguage: string;
+};
+
+export const translationEvent = 'bakbak:translation';
+
 const interactiveSelector = [
   'a[href]',
   'button',
@@ -284,6 +292,8 @@ export function describeWebsiteTool(
       return scrolled(args.direction);
     case 'focus_elements':
       return `Highlighting ${getElementIds(args.element_ids).length || 1} relevant section${getElementIds(args.element_ids).length === 1 ? '' : 's'}`;
+    case 'show_translation':
+      return 'Showing the translation';
     case 'navigate_to_page':
       try {
         return `Opened ${new URL(String(args.url), location.href).hostname.replace(/^www\./, '')}`;
@@ -385,6 +395,22 @@ export async function executeWebsiteTool(
     }
     case 'focus_elements':
       return focusElements(args.element_ids);
+    case 'show_translation': {
+      if (safety.isSensitive) return { error: safeModeMessage };
+      const originalText = typeof args.original_text === 'string' ? args.original_text.trim() : '';
+      const translatedText = typeof args.translated_text === 'string' ? args.translated_text.trim() : '';
+      const targetLanguage = typeof args.target_language === 'string' ? args.target_language.trim() : '';
+      if (!originalText || !translatedText || !targetLanguage) {
+        return { error: 'Original text, translated text, and target language are required.' };
+      }
+      const detail: TranslationView = {
+        originalText: originalText.slice(0, 2000),
+        translatedText: translatedText.slice(0, 2000),
+        targetLanguage: targetLanguage.slice(0, 80),
+      };
+      window.dispatchEvent(new CustomEvent(translationEvent, { detail }));
+      return { ok: true };
+    }
     case 'navigate_to_page': {
       if (safety.isSensitive) return { error: safeModeMessage };
       const url = typeof args.url === 'string' ? new URL(args.url, location.href) : undefined;
