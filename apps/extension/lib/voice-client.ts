@@ -96,22 +96,33 @@ const isVisible = (element: Element) => {
   return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
 };
 
-const getSensitiveFieldText = () =>
-  Array.from(document.querySelectorAll('input, textarea, select, label'))
+const getVisibleFormControls = () =>
+  Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select'))
+    .filter((element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+      element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement,
+    )
+    .filter((element) => isVisible(element) && !element.disabled);
+
+const getSensitiveFieldText = (controls: ReturnType<typeof getVisibleFormControls>) =>
+  controls
     .map((element) => [
       element.getAttribute('aria-label'),
       element.getAttribute('autocomplete'),
       element.getAttribute('id'),
       element.getAttribute('name'),
       element.getAttribute('placeholder'),
-      element.textContent,
+      ...Array.from(element.labels ?? []).filter(isVisible).map((label) => label.textContent),
     ].filter(Boolean).join(' '))
     .join(' ');
 
 export const getWebsiteSafety = (): WebsiteSafety => {
   const hostname = location.hostname;
-  const sensitiveFieldText = getSensitiveFieldText();
-  const hasCredentialField = Boolean(document.querySelector('input[type="password"], input[autocomplete="one-time-code"], input[autocomplete="cc-number"]'));
+  const visibleFormControls = getVisibleFormControls();
+  const sensitiveFieldText = getSensitiveFieldText(visibleFormControls);
+  const hasCredentialField = visibleFormControls.some((element) =>
+    element instanceof HTMLInputElement
+    && (element.type === 'password' || ['one-time-code', 'cc-number'].includes(element.autocomplete)),
+  );
   const hasSensitiveField = sensitiveFieldPattern.test(sensitiveFieldText);
   if (identityHostnamePattern.test(hostname) || /aadhaar|aadhar|pan.?number/i.test(sensitiveFieldText)) {
     return { isSensitive: true, reason: 'identity' };
