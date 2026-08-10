@@ -21,6 +21,7 @@ import {
   describeWebsiteTool,
   executeWebsiteTool,
   getWebsiteContext,
+  getWebsiteSafety,
   VoiceClient,
 } from "@/lib/voice-client";
 
@@ -164,6 +165,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isClosing, setIsClosing] = useState(false);
   const [isTucked, setIsTucked] = useState(false);
   const [title, setTitle] = useState(() => document.title || "Untitled page");
+  const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [seconds, setSeconds] = useState(0);
@@ -218,6 +220,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   useEffect(() => {
     ctx.addEventListener(window, "wxt:locationchange", () => {
       setTitle(document.title || "Untitled page");
+      setWebsiteSafety(getWebsiteSafety());
       setEntries([]);
       setError(null);
       voiceRef.current?.end();
@@ -272,6 +275,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
   const start = useCallback(async () => {
     setError(null);
+    setWebsiteSafety(getWebsiteSafety());
     const existingClient = voiceRef.current;
     if (voiceState === "paused" && existingClient) {
       try {
@@ -441,6 +445,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             {title}
           </p>
           <span className="scope-host">{hostname}</span>
+          {websiteSafety.isSensitive ? <span className="scope-safe">Read-only</span> : null}
         </div>
 
         {entries.length === 0 ? (

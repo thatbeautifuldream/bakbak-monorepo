@@ -31,6 +31,11 @@ export type WebsiteContext = {
   selected_text: string;
 };
 
+export type WebsiteSafety = {
+  isSensitive: boolean;
+  reason?: "financial" | "identity" | "credential";
+};
+
 const interactiveSelector = [
   'a[href]',
   'button',
@@ -58,6 +63,11 @@ const sectionSelector = [
   'article p',
 ].join(',');
 
+const sensitiveHostnamePattern = /(^|\.)(axisbank|bankofbaroda|canarabank|cred|federalbank|gpay|groww|hdfcbank|icicibank|idfcfirstbank|indusind|kotak|onlinesbi|paytm|phonepe|pnbindia|rblbank|sbi|yesbank|zerodha)\./i;
+const identityHostnamePattern = /(^|\.)(digilocker|incometax|uidai)\.gov\.in$/i;
+const sensitiveFieldPattern = /aadhaar|aadhar|account.?number|card.?number|cvv|debit.?card|credit.?card|ifsc|net.?banking|one.?time.?password|otp|pan.?number|password|pin|upi.?pin/i;
+const safeModeMessage = "Sensitive page detected. Bakbak is in read-only mode and does not share page text or perform browser actions here.";
+
 const highlightedElements = new Map<HTMLElement, Record<string, { value: string; priority: string }>>();
 let clearHighlightTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -65,6 +75,35 @@ const isVisible = (element: Element) => {
   const rect = element.getBoundingClientRect();
   const style = getComputedStyle(element);
   return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+};
+
+const getSensitiveFieldText = () =>
+  Array.from(document.querySelectorAll('input, textarea, select, label'))
+    .map((element) => [
+      element.getAttribute('aria-label'),
+      element.getAttribute('autocomplete'),
+      element.getAttribute('id'),
+      element.getAttribute('name'),
+      element.getAttribute('placeholder'),
+      element.textContent,
+    ].filter(Boolean).join(' '))
+    .join(' ');
+
+export const getWebsiteSafety = (): WebsiteSafety => {
+  const hostname = location.hostname;
+  const sensitiveFieldText = getSensitiveFieldText();
+  const hasCredentialField = Boolean(document.querySelector('input[type="password"], input[autocomplete="one-time-code"], input[autocomplete="cc-number"]'));
+  const hasSensitiveField = sensitiveFieldPattern.test(sensitiveFieldText);
+  if (identityHostnamePattern.test(hostname) || /aadhaar|aadhar|pan.?number/i.test(sensitiveFieldText)) {
+    return { isSensitive: true, reason: 'identity' };
+  }
+  if (sensitiveHostnamePattern.test(hostname)) {
+    return { isSensitive: true, reason: 'financial' };
+  }
+  if (hasCredentialField || hasSensitiveField) {
+    return { isSensitive: true, reason: 'credential' };
+  }
+  return { isSensitive: false };
 };
 
 const getElementLabel = (element: Element) =>
@@ -106,6 +145,12 @@ const getPageSections = () =>
       };
     })
     .filter(({ text }) => text.length > 0);
+
+const protectedContext = () => ({
+  title: 'Sensitive page',
+  url: location.origin + location.pathname,
+  text: safeModeMessage,
+});
 
 const encode = (audio: Uint8Array) => {
   let binary = '';
@@ -256,6 +301,7 @@ export async function executeWebsiteTool(
   name: string,
   args: Record<string, unknown> = {},
 ) {
+  const safety = getWebsiteSafety();
   switch (name) {
     case 'browser_action': {
       const action = typeof args.action === 'string' ? args.action : '';
@@ -276,6 +322,7 @@ export async function executeWebsiteTool(
         return { ok: true, action };
       }
       if (action === 'click') {
+        if (safety.isSensitive) return { error: safeModeMessage };
         const elementId = typeof args.element_id === 'string' ? args.element_id : '';
         const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
         if (!(element instanceof HTMLElement)) {
@@ -290,20 +337,25 @@ export async function executeWebsiteTool(
       return { error: `Unsupported browser action: ${action}` };
     }
     case 'get_page_context':
+      if (safety.isSensitive) return protectedContext();
       return {
         title: document.title,
         url: location.href,
         text: document.body?.innerText.slice(0, 12000) ?? '',
       };
     case 'get_selected_text':
+      if (safety.isSensitive) return { text: safeModeMessage };
       return { text: window.getSelection()?.toString() ?? '' };
     case 'get_accessibility_tree':
+      if (safety.isSensitive) return { accessibility_tree: safeModeMessage };
       return { accessibility_tree: JSON.stringify(getInteractiveElements()) };
     case 'get_page_metadata':
       return getWebsiteContext();
     case 'get_page_sections':
+      if (safety.isSensitive) return { sections: [], message: safeModeMessage };
       return { sections: getPageSections() };
     case 'click_element': {
+      if (safety.isSensitive) return { error: safeModeMessage };
       const elementId = typeof args.element_id === 'string' ? args.element_id : '';
       const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
       if (!(element instanceof HTMLElement)) return { error: 'Element not found. Refresh the accessibility tree.' };
@@ -314,6 +366,7 @@ export async function executeWebsiteTool(
       return { ok: true, element_id: elementId };
     }
     case 'fill_element': {
+      if (safety.isSensitive) return { error: safeModeMessage };
       const elementId = typeof args.element_id === 'string' ? args.element_id : '';
       const value = typeof args.value === 'string' ? args.value : '';
       const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
@@ -333,6 +386,7 @@ export async function executeWebsiteTool(
     case 'focus_elements':
       return focusElements(args.element_ids);
     case 'navigate_to_page': {
+      if (safety.isSensitive) return { error: safeModeMessage };
       const url = typeof args.url === 'string' ? new URL(args.url, location.href) : undefined;
       if (!url || !['http:', 'https:'].includes(url.protocol)) {
         return { error: 'Only HTTP and HTTPS pages can be opened.' };
@@ -349,6 +403,21 @@ export async function executeWebsiteTool(
 }
 
 export function getWebsiteContext(): WebsiteContext {
+  if (getWebsiteSafety().isSensitive) {
+    return {
+      page_title: 'Sensitive page',
+      page_url: location.origin + location.pathname,
+      page_hostname: location.hostname,
+      page_language: document.documentElement.lang || navigator.language,
+      meta_description: safeModeMessage,
+      canonical_url: location.origin + location.pathname,
+      page_content: safeModeMessage,
+      page_headings: '[]',
+      page_links: '[]',
+      accessibility_tree: '[]',
+      selected_text: '',
+    };
+  }
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .filter(isVisible)
     .slice(0, 80)
