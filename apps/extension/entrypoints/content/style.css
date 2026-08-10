@@ -416,7 +416,8 @@
 }
 
 .button-primary,
-.button-secondary {
+.button-secondary,
+.button-end {
   display: inline-flex;
   height: 30px;
   flex: 0 0 auto;
@@ -437,6 +438,8 @@
 .button-primary:disabled { cursor: wait; opacity: 0.5; }
 .button-secondary { background: var(--bak-well); color: var(--bak-fg); }
 .button-secondary:hover { background: var(--bak-well-hover); }
+.button-end { background: transparent; color: var(--bak-muted); }
+.button-end:hover { background: var(--bak-danger-bg); color: var(--bak-danger); }
 
 @keyframes bak-pulse {
   50% { opacity: 0.35; }
