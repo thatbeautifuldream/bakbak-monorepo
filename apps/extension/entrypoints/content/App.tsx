@@ -37,6 +37,20 @@ const CLOSE_MS = 150;
 const METER_BARS = 5;
 const TUCK_KEY = "bakbak:tucked";
 const READING_MODE_KEY = "bakbak:reading-mode";
+const microphonePolicyMessage = "This page blocks microphone access. This isn’t a Chrome permission setting.";
+
+type FeaturePolicy = {
+  allowsFeature: (feature: string) => boolean;
+};
+
+const pageBlocksMicrophone = () => {
+  const pageDocument = document as Document & {
+    featurePolicy?: FeaturePolicy;
+    permissionsPolicy?: FeaturePolicy;
+  };
+  const policy = pageDocument.permissionsPolicy ?? pageDocument.featurePolicy;
+  return policy?.allowsFeature("microphone") === false;
+};
 
 const inactivityMessages = {
   en: "I haven't heard a response, so this session has ended. I'm here whenever you're ready — press Start to talk again.",
@@ -336,13 +350,19 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     setError(null);
     setWebsiteSafety(getWebsiteSafety());
     wasReconnecting.current = false;
+    if (pageBlocksMicrophone()) {
+      setError(microphonePolicyMessage);
+      return;
+    }
     const existingClient = voiceRef.current;
     if (voiceState === "paused" && existingClient) {
       try {
         await existingClient.resume();
       } catch (cause) {
         existingClient.end();
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(pageBlocksMicrophone()
+          ? microphonePolicyMessage
+          : cause instanceof Error ? cause.message : String(cause));
       }
       return;
     }
@@ -417,7 +437,9 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       client.end();
       voiceRef.current = undefined;
       setVoiceState("idle");
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(pageBlocksMicrophone()
+        ? microphonePolicyMessage
+        : cause instanceof Error ? cause.message : String(cause));
     }
   }, [append, voiceState]);
 
