@@ -35,6 +35,7 @@ type Entry = { id: number; kind: "user" | "agent" | "action"; text: string };
 const CLOSE_MS = 150;
 const METER_BARS = 5;
 const TUCK_KEY = "bakbak:tucked";
+const READING_MODE_KEY = "bakbak:reading-mode";
 
 const inactivityMessages = {
   en: "I haven't heard a response, so this session has ended. I'm here whenever you're ready — press Start to talk again.",
@@ -169,6 +170,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isRevealed, setIsRevealed] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isTucked, setIsTucked] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
   const [title, setTitle] = useState(() => document.title || "Untitled page");
   const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
   const [translation, setTranslation] = useState<TranslationView | null>(null);
@@ -265,13 +267,37 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
   useEffect(() => {
     void browser.storage.local
-      .get(TUCK_KEY)
-      .then((stored) => setIsTucked(stored[TUCK_KEY] === true));
+      .get([TUCK_KEY, READING_MODE_KEY])
+      .then((stored) => {
+        setIsTucked(stored[TUCK_KEY] === true);
+        setReadingMode(stored[READING_MODE_KEY] === true);
+      });
   }, []);
 
   const tuck = useCallback((tucked: boolean) => {
     setIsTucked(tucked);
     void browser.storage.local.set({ [TUCK_KEY]: tucked });
+  }, []);
+
+  const toggleReadingMode = useCallback(() => {
+    setReadingMode((current) => {
+      const next = !current;
+      void browser.storage.local.set({ [READING_MODE_KEY]: next });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const openWithShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditing = target instanceof HTMLElement
+        && (target.isContentEditable || Boolean(target.closest('input, textarea, select, [contenteditable="true"]')));
+      if (isEditing || !event.altKey || event.ctrlKey || event.metaKey || event.key.toLowerCase() !== "b") return;
+      event.preventDefault();
+      setIsOpen(true);
+    };
+    window.addEventListener("keydown", openWithShortcut);
+    return () => window.removeEventListener("keydown", openWithShortcut);
   }, []);
 
   const close = useCallback(() => {
@@ -448,8 +474,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         ref={panelRef}
         tabIndex={-1}
         data-origin="bottom-right"
-        className={`panel t-dropdown ${isClosing ? "is-closing" : isRevealed ? "is-open" : ""}`}
-        aria-label="Bakbak"
+        className={`panel t-dropdown ${readingMode ? "panel-reading-mode" : ""} ${isClosing ? "is-closing" : isRevealed ? "is-open" : ""}`}
+        aria-label="Bakbak voice assistant. Press Alt and B to open this panel."
         onKeyDown={(event) => event.key === "Escape" && close()}
       >
         <header className="panel-header">
@@ -467,6 +493,16 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             )}
           </p>
           {hasConversation ? <time className="elapsed">{formatDuration(seconds)}</time> : null}
+          <button
+            className="button-ghost reading-mode-toggle"
+            type="button"
+            onClick={toggleReadingMode}
+            aria-label={readingMode ? "Use standard text size" : "Use larger reading text"}
+            aria-pressed={readingMode}
+            title={readingMode ? "Standard text size" : "Larger reading text"}
+          >
+            <span aria-hidden="true">A+</span>
+          </button>
           <button
             className="button-ghost"
             type="button"
@@ -527,10 +563,10 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
         {entries.length === 0 ? (
           <div className="empty">
-            <p>Ask about this page, or have Bakbak find and click through it.</p>
+            <p>Ask about this page, or have Bakbak find and click through it. Press Alt+B any time to open Bakbak.</p>
           </div>
         ) : (
-          <ol className="log" ref={logRef} role="list">
+          <ol className="log" ref={logRef} role="list" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
             {entries.map((entry) => (
               <li key={entry.id} className={`entry entry-${entry.kind}`}>
                 {entry.kind === "action" ? null : (
