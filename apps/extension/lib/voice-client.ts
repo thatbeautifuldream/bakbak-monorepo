@@ -42,7 +42,18 @@ export type TranslationView = {
   targetLanguage: string;
 };
 
+export type NewsTrustView = {
+  source: string;
+  canonicalUrl: string;
+  author?: string;
+  publishedAt?: string;
+  modifiedAt?: string;
+  contentType?: string;
+  hasStructuredData: boolean;
+};
+
 export const translationEvent = 'bakbak:translation';
+export const newsTrustEvent = 'bakbak:news-trust';
 
 const interactiveSelector = [
   'a[href]',
@@ -159,6 +170,67 @@ const protectedContext = () => ({
   url: location.origin + location.pathname,
   text: safeModeMessage,
 });
+
+const getMetaContent = (...selectors: string[]) => {
+  for (const selector of selectors) {
+    const value = document.querySelector(selector)?.getAttribute('content')?.trim();
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+
+const getStructuredArticles = () =>
+  Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+    .flatMap((script) => {
+      try {
+        const parsed = JSON.parse(script.textContent ?? '') as unknown;
+        const record = asRecord(parsed);
+        const graph = record && Array.isArray(record['@graph']) ? record['@graph'] : [parsed];
+        return graph.map(asRecord).filter((item): item is Record<string, unknown> => Boolean(item));
+      } catch {
+        return [];
+      }
+    })
+    .filter((article) => {
+      const type = article['@type'];
+      const types = Array.isArray(type) ? type : [type];
+      return types.some((value) => typeof value === 'string' && /article|news/i.test(value));
+    });
+
+const getAuthorName = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(getAuthorName).filter(Boolean).join(', ') || undefined;
+  const author = asRecord(value);
+  return typeof author?.name === 'string' ? author.name : undefined;
+};
+
+export const getNewsTrust = (): NewsTrustView => {
+  const article = getStructuredArticles()[0];
+  const articleType = article?.['@type'];
+  const types = Array.isArray(articleType) ? articleType : [articleType];
+  const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute('href');
+  const canonicalUrl = canonical ? new URL(canonical, location.href).href : location.href;
+  return {
+    source: getMetaContent('meta[property="og:site_name"]') ?? location.hostname.replace(/^www\./, ''),
+    canonicalUrl,
+    author: getMetaContent('meta[name="author"]', 'meta[property="article:author"]')
+      ?? getAuthorName(article?.author)
+      ?? document.querySelector('a[rel="author"]')?.textContent?.trim()
+      ?? undefined,
+    publishedAt: getMetaContent('meta[property="article:published_time"]', 'meta[name="date"]', 'meta[itemprop="datePublished"]')
+      ?? (typeof article?.datePublished === 'string' ? article.datePublished : undefined),
+    modifiedAt: getMetaContent('meta[property="article:modified_time"]', 'meta[itemprop="dateModified"]')
+      ?? (typeof article?.dateModified === 'string' ? article.dateModified : undefined),
+    contentType: types.find((value): value is string => typeof value === 'string')
+      ?? getMetaContent('meta[property="og:type"]'),
+    hasStructuredData: Boolean(article),
+  };
+};
 
 const encode = (audio: Uint8Array) => {
   let binary = '';
@@ -295,6 +367,8 @@ export function describeWebsiteTool(
       return `Highlighting ${getElementIds(args.element_ids).length || 1} relevant section${getElementIds(args.element_ids).length === 1 ? '' : 's'}`;
     case 'show_translation':
       return 'Showing the translation';
+    case 'get_news_trust':
+      return 'Showing source details';
     case 'navigate_to_page':
       try {
         return `Opened ${new URL(String(args.url), location.href).hostname.replace(/^www\./, '')}`;
@@ -411,6 +485,12 @@ export async function executeWebsiteTool(
       };
       window.dispatchEvent(new CustomEvent(translationEvent, { detail }));
       return { ok: true };
+    }
+    case 'get_news_trust': {
+      if (safety.isSensitive) return { error: safeModeMessage };
+      const detail = getNewsTrust();
+      window.dispatchEvent(new CustomEvent(newsTrustEvent, { detail }));
+      return detail;
     }
     case 'navigate_to_page': {
       if (safety.isSensitive) return { error: safeModeMessage };

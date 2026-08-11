@@ -22,7 +22,9 @@ import {
   executeWebsiteTool,
   getWebsiteContext,
   getWebsiteSafety,
+  newsTrustEvent,
   translationEvent,
+  type NewsTrustView,
   type TranslationView,
   VoiceClient,
 } from "@/lib/voice-client";
@@ -170,6 +172,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [title, setTitle] = useState(() => document.title || "Untitled page");
   const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
   const [translation, setTranslation] = useState<TranslationView | null>(null);
+  const [newsTrust, setNewsTrust] = useState<NewsTrustView | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [seconds, setSeconds] = useState(0);
@@ -228,6 +231,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       setTitle(document.title || "Untitled page");
       setWebsiteSafety(getWebsiteSafety());
       setTranslation(null);
+      setNewsTrust(null);
       setEntries([]);
       setError(null);
       voiceRef.current?.end();
@@ -247,6 +251,16 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     };
     window.addEventListener(translationEvent, showTranslation);
     return () => window.removeEventListener(translationEvent, showTranslation);
+  }, []);
+
+  useEffect(() => {
+    const showNewsTrust = (event: Event) => {
+      const detail = (event as CustomEvent<NewsTrustView>).detail;
+      if (!detail?.source || !detail.canonicalUrl) return;
+      setNewsTrust(detail);
+    };
+    window.addEventListener(newsTrustEvent, showNewsTrust);
+    return () => window.removeEventListener(newsTrustEvent, showNewsTrust);
   }, []);
 
   useEffect(() => {
@@ -486,6 +500,26 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               <p>{translation.translatedText}</p>
             </div>
             <button className="button-ghost translation-close" type="button" onClick={() => setTranslation(null)} aria-label="Close translation">
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
+          </section>
+        ) : null}
+
+        {newsTrust ? (
+          <section className="news-trust" aria-live="polite">
+            <div className="news-trust-heading">
+              <p>Source details</p>
+              <span>{newsTrust.hasStructuredData ? "Article metadata found" : "Limited article metadata"}</span>
+            </div>
+            <dl>
+              <div><dt>Source</dt><dd>{newsTrust.source}</dd></div>
+              <div><dt>Canonical</dt><dd><a href={newsTrust.canonicalUrl} target="_blank" rel="noreferrer">Open original</a></dd></div>
+              {newsTrust.author ? <div><dt>Author</dt><dd>{newsTrust.author}</dd></div> : null}
+              {newsTrust.publishedAt ? <div><dt>Published</dt><dd>{newsTrust.publishedAt}</dd></div> : null}
+              {newsTrust.modifiedAt ? <div><dt>Updated</dt><dd>{newsTrust.modifiedAt}</dd></div> : null}
+              {newsTrust.contentType ? <div><dt>Type</dt><dd>{newsTrust.contentType}</dd></div> : null}
+            </dl>
+            <button className="button-ghost news-trust-close" type="button" onClick={() => setNewsTrust(null)} aria-label="Close source details">
               <XMarkIcon className="icon" aria-hidden="true" />
             </button>
           </section>

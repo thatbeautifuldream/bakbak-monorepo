@@ -50,6 +50,7 @@ const browserToolNames = [
   "scroll_page",
   "focus_elements",
   "show_translation",
+  "get_news_trust",
   "navigate_to_page",
   "go_back",
 ] as const;
