@@ -1,6 +1,53 @@
-import { API_URL, SESSION_COOKIE, WEB_URL } from '@/lib/config';
+import { API_URL, SESSION_COOKIES, WEB_URL } from '@/lib/config';
 import type { AnalyticsEvent } from '@/lib/analytics';
-import type { Request, Response } from '@/lib/messages';
+import type { ApiReply, Request, Response, SessionUser } from '@/lib/messages';
+
+async function readSessionToken() {
+  for (const name of SESSION_COOKIES) {
+    const cookie = await browser.cookies.get({ url: WEB_URL, name });
+    if (cookie?.value) return cookie.value;
+  }
+  return undefined;
+}
+
+async function requireSessionToken() {
+  const token = await readSessionToken();
+  if (!token) throw new Error(`Sign in at ${WEB_URL} to use voice chat`);
+  return token;
+}
+
+async function readSession(): Promise<SessionUser | null> {
+  const token = await readSessionToken();
+  if (!token) return null;
+
+  const response = await fetch(new URL('/api/auth/get-session', API_URL), {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return null;
+
+  const body = await response.text();
+  if (!body) return null;
+  const session = JSON.parse(body) as { user?: SessionUser } | null;
+  return session?.user ?? null;
+}
+
+async function callApi(request: Extract<Request, { type: 'api' }>): Promise<ApiReply> {
+  const token = await readSessionToken();
+  const response = await fetch(new URL(request.url, API_URL), {
+    method: request.method,
+    headers: token
+      ? { ...request.headers, authorization: `Bearer ${token}` }
+      : request.headers,
+    body: request.body,
+  });
+
+  return {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    body: await response.text(),
+  };
+}
 
 const ANALYTICS_INSTALLATION_KEY = 'bakbak:analytics-installation';
 const ANALYTICS_QUEUE_KEY = 'bakbak:analytics-queue';
@@ -14,11 +61,6 @@ let creatingOffscreen: Promise<void> | undefined;
 let microphoneSession: { captureId: string; tabId: number } | undefined;
 
 const voiceSessionKey = (tabId: number) => `${VOICE_SESSION_KEY_PREFIX}${tabId}`;
-
-const getSessionToken = async () => {
-  const cookie = await browser.cookies.get({ url: WEB_URL, name: SESSION_COOKIE });
-  return cookie?.value;
-};
 
 const getInstallationId = async () => {
   const stored = await browser.storage.local.get(ANALYTICS_INSTALLATION_KEY);
@@ -39,7 +81,7 @@ const setQueuedEvents = (events: AnalyticsEvent[]) =>
   browser.storage.local.set({ [ANALYTICS_QUEUE_KEY]: events });
 
 const flushAnalyticsEvents = async () => {
-  const token = await getSessionToken();
+  const token = await readSessionToken();
   if (!token) return;
 
   const installationId = await getInstallationId();
@@ -65,7 +107,7 @@ const flushAnalyticsEvents = async () => {
 };
 
 const queueAnalyticsEvents = async (events: AnalyticsEvent[]) => {
-  if (!(await getSessionToken())) return;
+  if (!(await readSessionToken())) return;
   const queue = await getQueuedEvents();
   const queuedIds = new Set(queue.map((event) => event.id));
   const additions = events.filter((event) => !queuedIds.has(event.id));
@@ -115,11 +157,12 @@ async function handle(request: Request, sender: { tab?: { id?: number }; url?: s
     case 'open-login':
       await browser.tabs.create({ url: new URL('/login', WEB_URL).toString() });
       return undefined;
-    case 'session-token': {
-      const token = await getSessionToken();
-      if (!token) throw new Error(`Sign in at ${WEB_URL} to use voice chat`);
-      return token;
-    }
+    case 'session-token':
+      return requireSessionToken();
+    case 'session':
+      return readSession();
+    case 'api':
+      return callApi(request);
     case 'voice-session-save': {
       const tabId = sender.tab?.id;
       if (typeof tabId !== 'number') throw new Error('Voice navigation must originate from a browser tab.');

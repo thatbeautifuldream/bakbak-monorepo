@@ -44,7 +44,7 @@
     },
     "apps/extension": {
       "name": "extension",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@heroicons/react": "^2.2.0",
         "@mozilla/readability": "^0.6.0",
