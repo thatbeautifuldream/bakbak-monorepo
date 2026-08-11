@@ -249,6 +249,12 @@
 
 .button-ghost:hover { background: var(--bak-well); color: var(--bak-fg); }
 
+.reading-mode-toggle {
+  font-family: var(--bak-font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
 /* Page scope */
 
 .scope {
@@ -551,6 +557,43 @@
 .button-secondary:hover { background: var(--bak-well-hover); }
 .button-end { background: transparent; color: var(--bak-muted); }
 .button-end:hover { background: var(--bak-danger-bg); color: var(--bak-danger); }
+
+.panel-reading-mode .scope-title {
+  font-size: 0.9375rem;
+}
+
+.panel-reading-mode .scope-host,
+.panel-reading-mode .translation-label,
+.panel-reading-mode .news-trust-heading span,
+.panel-reading-mode .news-trust dt,
+.panel-reading-mode .who {
+  font-size: 0.75rem;
+}
+
+.panel-reading-mode .translation p,
+.panel-reading-mode .news-trust dd,
+.panel-reading-mode .news-trust-heading p,
+.panel-reading-mode .footer-note {
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+.panel-reading-mode .empty p,
+.panel-reading-mode .entry p {
+  font-size: 0.9375rem;
+  line-height: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 @keyframes bak-pulse {
   50% { opacity: 0.35; }
