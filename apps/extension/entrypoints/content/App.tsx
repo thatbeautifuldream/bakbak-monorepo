@@ -22,10 +22,14 @@ import {
   executeWebsiteTool,
   getWebsiteContext,
   getWebsiteSafety,
+  newsTrustEvent,
+  translationEvent,
+  type NewsTrustView,
+  type TranslationView,
   VoiceClient,
 } from "@/lib/voice-client";
 
-type VoiceState = "idle" | "connecting" | "connected" | "paused";
+type VoiceState = "idle" | "connecting" | "connected" | "reconnecting" | "paused";
 type Entry = { id: number; kind: "user" | "agent" | "action"; text: string };
 
 const CLOSE_MS = 150;
@@ -76,6 +80,7 @@ const stateLabel: Record<VoiceState, string> = {
   idle: "Ready",
   connecting: "Connecting",
   connected: "Listening",
+  reconnecting: "Reconnecting",
   paused: "Paused",
 };
 
@@ -166,6 +171,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isTucked, setIsTucked] = useState(false);
   const [title, setTitle] = useState(() => document.title || "Untitled page");
   const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
+  const [translation, setTranslation] = useState<TranslationView | null>(null);
+  const [newsTrust, setNewsTrust] = useState<NewsTrustView | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [seconds, setSeconds] = useState(0);
@@ -175,6 +182,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const voiceRef = useRef<VoiceClient | undefined>(undefined);
   const entryId = useRef(0);
   const inactivityLanguage = useRef<InactivityLanguage>(languageFromBrowser());
+  const wasReconnecting = useRef(false);
   const levelListener = useRef<((level: number) => void) | undefined>(
     undefined,
   );
@@ -187,8 +195,9 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   }, []);
 
   const isLive = voiceState === "connected";
+  const isReconnecting = voiceState === "reconnecting";
   const isPaused = voiceState === "paused";
-  const hasConversation = isLive || isPaused;
+  const hasConversation = isLive || isReconnecting || isPaused;
 
   const append = useCallback((kind: Entry["kind"], text: string) => {
     setEntries((current) => {
@@ -221,6 +230,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     ctx.addEventListener(window, "wxt:locationchange", () => {
       setTitle(document.title || "Untitled page");
       setWebsiteSafety(getWebsiteSafety());
+      setTranslation(null);
+      setNewsTrust(null);
       setEntries([]);
       setError(null);
       voiceRef.current?.end();
@@ -231,6 +242,26 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   }, [ctx]);
 
   useEffect(() => () => voiceRef.current?.end(), []);
+
+  useEffect(() => {
+    const showTranslation = (event: Event) => {
+      const detail = (event as CustomEvent<TranslationView>).detail;
+      if (!detail?.originalText || !detail.translatedText || !detail.targetLanguage) return;
+      setTranslation(detail);
+    };
+    window.addEventListener(translationEvent, showTranslation);
+    return () => window.removeEventListener(translationEvent, showTranslation);
+  }, []);
+
+  useEffect(() => {
+    const showNewsTrust = (event: Event) => {
+      const detail = (event as CustomEvent<NewsTrustView>).detail;
+      if (!detail?.source || !detail.canonicalUrl) return;
+      setNewsTrust(detail);
+    };
+    window.addEventListener(newsTrustEvent, showNewsTrust);
+    return () => window.removeEventListener(newsTrustEvent, showNewsTrust);
+  }, []);
 
   useEffect(() => {
     void browser.storage.local
@@ -276,6 +307,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const start = useCallback(async () => {
     setError(null);
     setWebsiteSafety(getWebsiteSafety());
+    wasReconnecting.current = false;
     const existingClient = voiceRef.current;
     if (voiceState === "paused" && existingClient) {
       try {
@@ -297,8 +329,17 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             setEntries([]);
             setSeconds(0);
           }
+          wasReconnecting.current = false;
           setVoiceState("idle");
           return;
+        }
+        if (state === "reconnecting") {
+          wasReconnecting.current = true;
+          append("action", "Connection lost — reconnecting.");
+        }
+        if (state === "connected" && wasReconnecting.current) {
+          wasReconnecting.current = false;
+          append("action", "Reconnected. You can keep talking.");
         }
         setVoiceState(state);
       },
@@ -363,7 +404,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             className="nub"
             type="button"
             onClick={() => tuck(false)}
-            aria-label={isLive ? "Show Bakbak, session live" : isPaused ? "Show Bakbak, conversation paused" : "Show Bakbak"}
+            aria-label={isLive ? "Show Bakbak, session live" : isReconnecting ? "Show Bakbak, reconnecting" : isPaused ? "Show Bakbak, conversation paused" : "Show Bakbak"}
           >
             {isLive ? <span className="nub-dot" aria-hidden="true" /> : null}
           </button>
@@ -387,13 +428,13 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               className={`launcher t-tt-trigger ${isLive ? "launcher-live" : ""}`}
               type="button"
               onClick={() => setIsOpen(true)}
-              aria-label={isLive ? "Open Bakbak, session live" : isPaused ? "Open Bakbak, conversation paused" : "Open Bakbak"}
+              aria-label={isLive ? "Open Bakbak, session live" : isReconnecting ? "Open Bakbak, reconnecting" : isPaused ? "Open Bakbak, conversation paused" : "Open Bakbak"}
             >
               <MicrophoneIcon className="icon" aria-hidden="true" />
               {isLive ? <LiveRing subscribe={subscribeToLevel} /> : null}
             </button>
             <span className="t-tt" role="tooltip">
-              {isLive ? `Bakbak · ${formatDuration(seconds)}` : isPaused ? "Bakbak · paused" : "Bakbak"}
+              {isLive ? `Bakbak · ${formatDuration(seconds)}` : isReconnecting ? "Bakbak · reconnecting" : isPaused ? "Bakbak · paused" : "Bakbak"}
             </span>
           </span>
         </div>
@@ -417,9 +458,9 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             aria-hidden="true"
           />
           <p className="state" role="status">
-            {voiceState === "connecting" ? (
-              <span className="t-shimmer" data-text="Connecting">
-                Connecting
+            {voiceState === "connecting" || voiceState === "reconnecting" ? (
+              <span className="t-shimmer" data-text={stateLabel[voiceState]}>
+                {stateLabel[voiceState]}
               </span>
             ) : (
               <StateLabel label={stateLabel[voiceState]} />
@@ -430,7 +471,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             className="button-ghost"
             type="button"
             onClick={close}
-            aria-label={isLive ? "Minimise, keep conversation running" : isPaused ? "Minimise, keep conversation paused" : "Close Bakbak"}
+            aria-label={isLive ? "Minimise, keep conversation running" : isReconnecting ? "Minimise, keep reconnecting" : isPaused ? "Minimise, keep conversation paused" : "Close Bakbak"}
           >
             {hasConversation ? (
               <MinusIcon className="icon" aria-hidden="true" />
@@ -447,6 +488,42 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           <span className="scope-host">{hostname}</span>
           {websiteSafety.isSensitive ? <span className="scope-safe">Read-only</span> : null}
         </div>
+
+        {translation ? (
+          <section className="translation" aria-live="polite">
+            <div>
+              <p className="translation-label">Original</p>
+              <p>{translation.originalText}</p>
+            </div>
+            <div>
+              <p className="translation-label">{translation.targetLanguage}</p>
+              <p>{translation.translatedText}</p>
+            </div>
+            <button className="button-ghost translation-close" type="button" onClick={() => setTranslation(null)} aria-label="Close translation">
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
+          </section>
+        ) : null}
+
+        {newsTrust ? (
+          <section className="news-trust" aria-live="polite">
+            <div className="news-trust-heading">
+              <p>Source details</p>
+              <span>{newsTrust.hasStructuredData ? "Article metadata found" : "Limited article metadata"}</span>
+            </div>
+            <dl>
+              <div><dt>Source</dt><dd>{newsTrust.source}</dd></div>
+              <div><dt>Canonical</dt><dd><a href={newsTrust.canonicalUrl} target="_blank" rel="noreferrer">Open original</a></dd></div>
+              {newsTrust.author ? <div><dt>Author</dt><dd>{newsTrust.author}</dd></div> : null}
+              {newsTrust.publishedAt ? <div><dt>Published</dt><dd>{newsTrust.publishedAt}</dd></div> : null}
+              {newsTrust.modifiedAt ? <div><dt>Updated</dt><dd>{newsTrust.modifiedAt}</dd></div> : null}
+              {newsTrust.contentType ? <div><dt>Type</dt><dd>{newsTrust.contentType}</dd></div> : null}
+            </dl>
+            <button className="button-ghost news-trust-close" type="button" onClick={() => setNewsTrust(null)} aria-label="Close source details">
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
+          </section>
+        ) : null}
 
         {entries.length === 0 ? (
           <div className="empty">
@@ -487,6 +564,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         <footer className="panel-footer">
           {isLive ? (
             <Meter subscribe={subscribeToLevel} />
+          ) : isReconnecting ? (
+            <p className="footer-note">Connection lost. Reconnecting automatically…</p>
           ) : isPaused ? (
             <p className="footer-note">Conversation paused. Resume when you&apos;re ready.</p>
           ) : (
@@ -502,6 +581,11 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
                 End
               </button>
             </>
+          ) : isReconnecting ? (
+            <button className="button-end" type="button" onClick={endConversation} aria-label="End conversation">
+              <StopIcon className="icon" aria-hidden="true" />
+              End
+            </button>
           ) : isPaused ? (
             <>
               <button className="button-end" type="button" onClick={endConversation} aria-label="End conversation">

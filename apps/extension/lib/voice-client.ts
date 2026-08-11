@@ -36,6 +36,25 @@ export type WebsiteSafety = {
   reason?: "financial" | "identity" | "credential";
 };
 
+export type TranslationView = {
+  originalText: string;
+  translatedText: string;
+  targetLanguage: string;
+};
+
+export type NewsTrustView = {
+  source: string;
+  canonicalUrl: string;
+  author?: string;
+  publishedAt?: string;
+  modifiedAt?: string;
+  contentType?: string;
+  hasStructuredData: boolean;
+};
+
+export const translationEvent = 'bakbak:translation';
+export const newsTrustEvent = 'bakbak:news-trust';
+
 const interactiveSelector = [
   'a[href]',
   'button',
@@ -152,6 +171,67 @@ const protectedContext = () => ({
   text: safeModeMessage,
 });
 
+const getMetaContent = (...selectors: string[]) => {
+  for (const selector of selectors) {
+    const value = document.querySelector(selector)?.getAttribute('content')?.trim();
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+
+const getStructuredArticles = () =>
+  Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+    .flatMap((script) => {
+      try {
+        const parsed = JSON.parse(script.textContent ?? '') as unknown;
+        const record = asRecord(parsed);
+        const graph = record && Array.isArray(record['@graph']) ? record['@graph'] : [parsed];
+        return graph.map(asRecord).filter((item): item is Record<string, unknown> => Boolean(item));
+      } catch {
+        return [];
+      }
+    })
+    .filter((article) => {
+      const type = article['@type'];
+      const types = Array.isArray(type) ? type : [type];
+      return types.some((value) => typeof value === 'string' && /article|news/i.test(value));
+    });
+
+const getAuthorName = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(getAuthorName).filter(Boolean).join(', ') || undefined;
+  const author = asRecord(value);
+  return typeof author?.name === 'string' ? author.name : undefined;
+};
+
+export const getNewsTrust = (): NewsTrustView => {
+  const article = getStructuredArticles()[0];
+  const articleType = article?.['@type'];
+  const types = Array.isArray(articleType) ? articleType : [articleType];
+  const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute('href');
+  const canonicalUrl = canonical ? new URL(canonical, location.href).href : location.href;
+  return {
+    source: getMetaContent('meta[property="og:site_name"]') ?? location.hostname.replace(/^www\./, ''),
+    canonicalUrl,
+    author: getMetaContent('meta[name="author"]', 'meta[property="article:author"]')
+      ?? getAuthorName(article?.author)
+      ?? document.querySelector('a[rel="author"]')?.textContent?.trim()
+      ?? undefined,
+    publishedAt: getMetaContent('meta[property="article:published_time"]', 'meta[name="date"]', 'meta[itemprop="datePublished"]')
+      ?? (typeof article?.datePublished === 'string' ? article.datePublished : undefined),
+    modifiedAt: getMetaContent('meta[property="article:modified_time"]', 'meta[itemprop="dateModified"]')
+      ?? (typeof article?.dateModified === 'string' ? article.dateModified : undefined),
+    contentType: types.find((value): value is string => typeof value === 'string')
+      ?? getMetaContent('meta[property="og:type"]'),
+    hasStructuredData: Boolean(article),
+  };
+};
+
 const encode = (audio: Uint8Array) => {
   let binary = '';
   for (const byte of audio) binary += String.fromCharCode(byte);
@@ -174,6 +254,7 @@ const socketUrl = (token: string) => {
 };
 
 const interactionEndType = 'server.action.interaction_end';
+const reconnectDelays = [1000, 2000];
 
 async function getSessionToken() {
   return send({ type: 'session-token' });
@@ -181,7 +262,7 @@ async function getSessionToken() {
 
 export type VoiceClientCallbacks = {
   onMessage: (message: VoiceMessage) => void;
-  onState: (state: 'connecting' | 'connected' | 'paused' | 'closed') => void;
+  onState: (state: 'connecting' | 'connected' | 'reconnecting' | 'paused' | 'closed') => void;
   onLevel?: (level: number) => void;
   onError?: (message: string) => void;
 };
@@ -284,6 +365,10 @@ export function describeWebsiteTool(
       return scrolled(args.direction);
     case 'focus_elements':
       return `Highlighting ${getElementIds(args.element_ids).length || 1} relevant section${getElementIds(args.element_ids).length === 1 ? '' : 's'}`;
+    case 'show_translation':
+      return 'Showing the translation';
+    case 'get_news_trust':
+      return 'Showing source details';
     case 'navigate_to_page':
       try {
         return `Opened ${new URL(String(args.url), location.href).hostname.replace(/^www\./, '')}`;
@@ -385,6 +470,28 @@ export async function executeWebsiteTool(
     }
     case 'focus_elements':
       return focusElements(args.element_ids);
+    case 'show_translation': {
+      if (safety.isSensitive) return { error: safeModeMessage };
+      const originalText = typeof args.original_text === 'string' ? args.original_text.trim() : '';
+      const translatedText = typeof args.translated_text === 'string' ? args.translated_text.trim() : '';
+      const targetLanguage = typeof args.target_language === 'string' ? args.target_language.trim() : '';
+      if (!originalText || !translatedText || !targetLanguage) {
+        return { error: 'Original text, translated text, and target language are required.' };
+      }
+      const detail: TranslationView = {
+        originalText: originalText.slice(0, 2000),
+        translatedText: translatedText.slice(0, 2000),
+        targetLanguage: targetLanguage.slice(0, 80),
+      };
+      window.dispatchEvent(new CustomEvent(translationEvent, { detail }));
+      return { ok: true };
+    }
+    case 'get_news_trust': {
+      if (safety.isSensitive) return { error: safeModeMessage };
+      const detail = getNewsTrust();
+      window.dispatchEvent(new CustomEvent(newsTrustEvent, { detail }));
+      return detail;
+    }
     case 'navigate_to_page': {
       if (safety.isSensitive) return { error: safeModeMessage };
       const url = typeof args.url === 'string' ? new URL(args.url, location.href) : undefined;
@@ -448,6 +555,9 @@ export class VoiceClient {
   private isReady = false;
   private isClosed = false;
   private isPaused = false;
+  private context?: WebsiteContext;
+  private reconnectAttempt = 0;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingAcknowledgement?: {
     type: 'paused' | 'resumed';
     resolve: () => void;
@@ -458,19 +568,30 @@ export class VoiceClient {
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
   async start(context: WebsiteContext) {
-    const { url, token } = socketUrl(await getSessionToken());
+    this.context = context;
     this.isClosed = false;
     this.isPaused = false;
     this.isReady = false;
+    this.reconnectAttempt = 0;
     this.callbacks.onState('connecting');
-    this.socket = new WebSocket(url, ['bearer', token]);
-    this.socket.addEventListener('message', (event) => {
+    await this.connect();
+    if (!this.isClosed) await this.startAudioCapture();
+  }
+
+  private async connect() {
+    const { url, token } = socketUrl(await getSessionToken());
+    if (this.isClosed) return;
+    const socket = new WebSocket(url, ['bearer', token]);
+    this.socket = socket;
+    socket.addEventListener('message', (event) => {
+      if (this.socket !== socket || this.isClosed) return;
       const message = JSON.parse(String(event.data)) as VoiceMessage;
       if (message.type === 'context_required') {
-        this.socket?.send(JSON.stringify({ type: 'init', context }));
+        if (this.context) socket.send(JSON.stringify({ type: 'init', context: this.context }));
       }
       if (message.type === 'ready') {
         this.isReady = true;
+        this.reconnectAttempt = 0;
         this.callbacks.onState('connected');
       }
       if (message.type === 'paused') {
@@ -485,9 +606,9 @@ export class VoiceClient {
       }
       if (message.type === interactionEndType) {
         this.finish();
+        socket.close();
       }
       if (message.type === 'error') {
-        const socket = this.socket;
         this.callbacks.onError?.(message.message ?? 'The conversation could not continue.');
         this.finish();
         socket?.close();
@@ -500,13 +621,8 @@ export class VoiceClient {
       }
       this.callbacks.onMessage(message);
     });
-    this.socket.addEventListener('close', () => this.finish());
-    this.socket.addEventListener('error', () => {
-      this.callbacks.onError?.('WebSocket connection error.');
-      this.finish();
-    });
-
-    await this.startAudioCapture();
+    socket.addEventListener('close', () => this.handleSocketClosed(socket));
+    socket.addEventListener('error', () => socket.close());
   }
 
   async pause() {
@@ -600,12 +716,40 @@ export class VoiceClient {
     this.pendingAcknowledgement = undefined;
   }
 
+  private handleSocketClosed(socket?: WebSocket) {
+    if (socket && this.socket !== socket) return;
+    this.socket = undefined;
+    this.isReady = false;
+    if (this.isClosed) return;
+    if (this.isPaused || !this.context) {
+      this.finish();
+      return;
+    }
+    if (this.reconnectAttempt >= reconnectDelays.length) {
+      this.callbacks.onError?.('Connection lost. Press Start to begin a new session.');
+      this.finish();
+      return;
+    }
+    if (this.reconnectTimer) return;
+    const delay = reconnectDelays[this.reconnectAttempt++];
+    this.callbacks.onState('reconnecting');
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      void this.connect().catch(() => this.handleSocketClosed());
+    }, delay);
+  }
+
   private finish() {
     if (this.isClosed) return;
     this.isClosed = true;
     this.isReady = false;
     this.isPaused = false;
+    this.context = undefined;
     this.socket = undefined;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     if (this.pendingAcknowledgement) {
       clearTimeout(this.pendingAcknowledgement.timeout);
       this.pendingAcknowledgement.reject(new Error('The conversation ended.'));
