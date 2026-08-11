@@ -14,7 +14,11 @@ const updateWhere = vi.fn(() => ({ returning: updateReturning }));
 const updateSet = vi.fn(() => ({ where: updateWhere }));
 
 const insertReturning = vi.fn(async () => insertRows);
-const insertValues = vi.fn(() => ({ returning: insertReturning }));
+const insertOnConflictDoNothing = vi.fn(() => ({ returning: insertReturning }));
+const insertValues = vi.fn(() => ({
+  onConflictDoNothing: insertOnConflictDoNothing,
+  returning: insertReturning,
+}));
 
 const deleteReturning = vi.fn(async () => deleteRows);
 const deleteWhere = vi.fn(() => ({ returning: deleteReturning }));
@@ -34,6 +38,7 @@ export const dbMocks = {
   updateWhere,
   updateSet,
   insertReturning,
+  insertOnConflictDoNothing,
   insertValues,
   deleteReturning,
   deleteWhere,

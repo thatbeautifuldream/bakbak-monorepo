@@ -1,12 +1,17 @@
 import type { Metadata } from "next"
-import AnalyticsDashboard, { type AnalyticsData } from "./analytics-dashboard"
-import initialData from "../../public/analytics-data/1d.json"
+import { SiteHeader } from "@/components/site-header"
+import AnalyticsDashboard from "./analytics-dashboard"
 
 export const metadata: Metadata = {
   title: "Analytics · Bakbak",
-  description: "Aggregate web activity analytics presentation dashboard.",
+  description: "Aggregate Bakbak extension activity analytics.",
 }
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboard initialData={initialData as AnalyticsData} />
+  return (
+    <main className="min-h-dvh bg-background text-foreground">
+      <SiteHeader />
+      <AnalyticsDashboard />
+    </main>
+  )
 }

@@ -177,13 +177,12 @@ bun run db:migrate
 | `BETTER_AUTH_URL` | Yes | API base URL (default: `http://localhost:3000`) |
 | `TRUSTED_ORIGINS` | Yes | Comma-separated allowed origins |
 | `WEB_APP_URL` | Yes | Frontend URL for callbacks |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
 | `SARVAM_CONVERSATIONS_API_KEY` | Yes for voice | Sarvam Conversations API key |
 | `SARVAM_VOICE_AGENT_ID` | Yes for voice | Sarvam voice-agent app ID |
 | `SARVAM_ORG_ID` | Yes for voice | Sarvam organization ID |
 | `SARVAM_WORKSPACE_ID` | Yes for voice | Sarvam workspace ID |
 | `SARVAM_TOOL_SECRET` | Yes for browser tools | Bearer secret configured on Sarvam API tools |
+| `ANALYTICS_HASH_SECRET` | Yes for analytics | Secret used to pseudonymise extension installations |
 
 ### Website (`apps/website/.env`)
 

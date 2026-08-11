@@ -158,11 +158,12 @@ type VoiceSessionOptions = {
   agent: VoiceAgent;
   onCleanup: () => void;
   onToolResult: (message: Extract<VoiceClientMessage, { type: "tool_result" }>) => void;
-  socket: VoiceSocket;
+  socket?: VoiceSocket;
+  getSocket?: () => VoiceSocket | undefined;
 };
 
-const send = (socket: VoiceSocket, message: unknown) => {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+const send = (socket: VoiceSocket | undefined, message: unknown) => {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 };
 
 export const createVoiceSession = ({
@@ -170,16 +171,19 @@ export const createVoiceSession = ({
   onCleanup,
   onToolResult,
   socket,
+  getSocket,
 }: VoiceSessionOptions) => {
   let ended = false;
   let paused = false;
+  const activeSocket = () => getSocket?.() ?? socket;
 
   const finish = async (notifyClient: boolean) => {
     if (ended) return;
     ended = true;
     onCleanup();
-    if (notifyClient) send(socket, { type: "server.action.interaction_end" });
-    if (socket.readyState === WebSocket.OPEN) socket.close(1000);
+    const currentSocket = activeSocket();
+    if (notifyClient) send(currentSocket, { type: "server.action.interaction_end" });
+    if (currentSocket?.readyState === WebSocket.OPEN) currentSocket.close(1000);
     await agent.stop().catch(() => undefined);
   };
 
@@ -192,7 +196,7 @@ export const createVoiceSession = ({
           await agent.mute();
           paused = true;
         }
-        if (!ended) send(socket, { type: "paused" });
+        if (!ended) send(activeSocket(), { type: "paused" });
         return;
       }
 
@@ -201,7 +205,7 @@ export const createVoiceSession = ({
           await agent.unmute();
           paused = false;
         }
-        if (!ended) send(socket, { type: "resumed" });
+        if (!ended) send(activeSocket(), { type: "resumed" });
         return;
       }
 
@@ -222,7 +226,7 @@ export const createVoiceSession = ({
 
 const forwardTranscriptionsWithoutSdkWarning = (
   agent: ConversationAgent,
-  socket: WebSocket,
+  getSocket: () => VoiceSocket | undefined,
 ) => {
   const internalAgent = agent as unknown as {
     agent: { routeMessage: (message: unknown) => Promise<void> };
@@ -236,7 +240,7 @@ const forwardTranscriptionsWithoutSdkWarning = (
       "type" in message &&
       message.type === "server.event.transcription"
     ) {
-      send(socket, message);
+      send(getSocket(), message);
       return;
     }
     await routeMessage(message);
@@ -320,9 +324,78 @@ const authenticate = async (request: IncomingMessage) => {
   return Boolean(await auth.api.getSession({ headers }));
 };
 
+const voiceReconnectGraceMs = 30_000;
+
+type VoiceTransport = {
+  socket?: WebSocket;
+};
+
+type ResumableVoiceSession = {
+  id: string;
+  session: ReturnType<typeof createVoiceSession>;
+  transport: VoiceTransport;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
+};
+
+const resumableVoiceSessions = new Map<string, ResumableVoiceSession>();
+
+const attachSocketToResumableSession = (
+  resumableSession: ResumableVoiceSession,
+  socket: WebSocket,
+) => {
+  if (resumableSession.cleanupTimer) {
+    clearTimeout(resumableSession.cleanupTimer);
+    resumableSession.cleanupTimer = undefined;
+  }
+  resumableSession.transport.socket = socket;
+
+  socket.on("message", async (raw) => {
+    try {
+      const message = JSON.parse(raw.toString()) as VoiceClientMessage;
+      await resumableSession.session.handleMessage(message);
+    } catch (error) {
+      send(socket, {
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      void resumableSession.session.close();
+    }
+  });
+
+  socket.on("close", () => {
+    if (
+      resumableVoiceSessions.get(resumableSession.id) !== resumableSession
+      || resumableSession.transport.socket !== socket
+    ) {
+      return;
+    }
+    resumableSession.transport.socket = undefined;
+    resumableSession.cleanupTimer = setTimeout(() => {
+      if (resumableVoiceSessions.get(resumableSession.id) === resumableSession) {
+        void resumableSession.session.close();
+      }
+    }, voiceReconnectGraceMs);
+  });
+
+  send(socket, { type: "ready", session_id: resumableSession.id });
+};
+
 const handleConnection = async (socket: WebSocket, request: IncomingMessage) => {
   if (!(await authenticate(request))) {
     socket.close(1008, "Authentication required");
+    return;
+  }
+
+  const resumeSessionId = new URL(request.url ?? "/ws/voice", "http://localhost")
+    .searchParams.get("resume_session_id");
+  if (resumeSessionId) {
+    const resumableSession = resumableVoiceSessions.get(resumeSessionId);
+    if (!resumableSession) {
+      send(socket, { type: "error", message: "The previous voice session has ended. Press Start to begin again." });
+      socket.close(1008, "Voice session not found");
+      return;
+    }
+    attachSocketToResumableSession(resumableSession, socket);
     return;
   }
 
@@ -338,6 +411,8 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
   let agent: ConversationAgent;
   let browserSessionId: string | undefined;
   let session: ReturnType<typeof createVoiceSession> | undefined;
+  const transport: VoiceTransport = { socket };
+  const resumableSessionId = randomUUID();
   try {
     const contextPromise = waitForContext(socket);
     send(socket, { type: "context_required" });
@@ -345,7 +420,7 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
     browserSessionId = randomUUID();
     browserToolBridge.register(browserSessionId, (call) => {
       logBrowserTool("forwarded to extension", { tool: call.name, action: call.arguments.action });
-      send(socket, {
+      send(transport.socket, {
         type: "browser_tool_call",
         request_id: call.requestId,
         name: call.name,
@@ -357,18 +432,21 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
       config: getVoiceConfig({ ...agentVariables, voice_session_id: browserSessionId }),
       platform: "node",
       audioInterface: serverAudioInterface,
-      audioCallback: async (message) => send(socket, message),
-      textCallback: async (message) => send(socket, message),
-      transcriptCallback: async (message) => send(socket, message),
-      eventCallback: async (event) => send(socket, event),
+      audioCallback: async (message) => send(transport.socket, message),
+      textCallback: async (message) => send(transport.socket, message),
+      transcriptCallback: async (message) => send(transport.socket, message),
+      eventCallback: async (event) => send(transport.socket, event),
       endCallback: async () => session?.endByAgent(),
     });
-    forwardTranscriptionsWithoutSdkWarning(agent, socket);
+    forwardTranscriptionsWithoutSdkWarning(agent, () => transport.socket);
     session = createVoiceSession({
       agent,
-      socket,
+      getSocket: () => transport.socket,
       onCleanup: () => {
         if (browserSessionId) browserToolBridge.unregister(browserSessionId);
+        const resumableSession = resumableVoiceSessions.get(resumableSessionId);
+        if (resumableSession?.cleanupTimer) clearTimeout(resumableSession.cleanupTimer);
+        resumableVoiceSessions.delete(resumableSessionId);
       },
       onToolResult: (message) => {
         if (!browserSessionId || !message.request_id) return;
@@ -392,7 +470,14 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
       await session.close();
       return;
     }
-    send(socket, { type: "ready" });
+    if (!session) throw new Error("Voice session could not be created");
+    const resumableSession: ResumableVoiceSession = {
+      id: resumableSessionId,
+      session,
+      transport,
+    };
+    resumableVoiceSessions.set(resumableSession.id, resumableSession);
+    attachSocketToResumableSession(resumableSession, socket);
   } catch (error) {
     send(socket, {
       type: "error",
@@ -403,23 +488,6 @@ const handleConnection = async (socket: WebSocket, request: IncomingMessage) => 
     socket.close(1011, "Unable to start voice agent");
     return;
   }
-
-  socket.on("message", async (raw) => {
-    try {
-      const message = JSON.parse(raw.toString()) as VoiceClientMessage;
-      await session?.handleMessage(message);
-    } catch (error) {
-      send(socket, {
-        type: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-      void session?.close();
-    }
-  });
-
-  socket.on("close", () => {
-    void session?.close();
-  });
 };
 
 export const attachVoiceWebSocket = (server: Server) => {

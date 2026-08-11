@@ -1,6 +1,6 @@
 import { BrowserAudioInterface } from 'sarvam-conv-ai-sdk/browser';
 import { API_URL } from './config';
-import { send } from './messages';
+import { saveVoiceSessionForNavigation, send } from './messages';
 
 type VoiceMessage = {
   type: string;
@@ -13,6 +13,7 @@ type VoiceMessage = {
   name?: string;
   tool_name?: string;
   request_id?: string;
+  session_id?: string;
   arguments?: Record<string, unknown>;
   parameters?: Record<string, unknown>;
 };
@@ -249,9 +250,10 @@ const decode = (value: string) => {
   return bytes;
 };
 
-const socketUrl = (token: string) => {
+const socketUrl = (token: string, resumeSessionId?: string) => {
   const url = new URL('/ws/voice', API_URL);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (resumeSessionId) url.searchParams.set('resume_session_id', resumeSessionId);
   return { url: url.toString(), token };
 };
 
@@ -453,6 +455,13 @@ export async function executeWebsiteTool(
       if (element.matches('button[type="submit"], input[type="submit"]')) {
         return { error: 'Submitting forms by voice is not enabled.' };
       }
+      const link = element.closest('a[href]');
+      if (link instanceof HTMLAnchorElement && !link.download && link.target !== '_blank') {
+        const url = new URL(link.href, location.href);
+        if (['http:', 'https:'].includes(url.protocol)) {
+          return { ok: true, element_id: elementId, navigation_url: url.href };
+        }
+      }
       element.click();
       return { ok: true, element_id: elementId };
     }
@@ -505,7 +514,6 @@ export async function executeWebsiteTool(
       if (!url || !['http:', 'https:'].includes(url.protocol)) {
         return { error: 'Only HTTP and HTTPS pages can be opened.' };
       }
-      location.assign(url.href);
       return { ok: true, url: url.href };
     }
     case 'go_back':
@@ -563,6 +571,8 @@ export class VoiceClient {
   private isClosed = false;
   private isPaused = false;
   private context?: WebsiteContext;
+  private resumeSessionId?: string;
+  private isNavigating = false;
   private reconnectAttempt = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingAcknowledgement?: {
@@ -574,19 +584,34 @@ export class VoiceClient {
 
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
-  async start(context: WebsiteContext) {
+  async start(context: WebsiteContext, resumeSessionId?: string) {
     this.context = context;
     this.isClosed = false;
     this.isPaused = false;
     this.isReady = false;
+    this.isNavigating = false;
+    this.resumeSessionId = resumeSessionId;
     this.reconnectAttempt = 0;
-    this.callbacks.onState('connecting');
+    this.callbacks.onState(resumeSessionId ? 'reconnecting' : 'connecting');
     await this.connect();
     if (!this.isClosed) await this.startAudioCapture();
   }
 
+  async prepareForNavigation() {
+    if (this.isClosed || !this.isReady || !this.resumeSessionId) return false;
+    await saveVoiceSessionForNavigation(this.resumeSessionId);
+    this.isNavigating = true;
+    await this.audio.stop();
+    this.callbacks.onLevel?.(0);
+    return true;
+  }
+
+  updateContext(context: WebsiteContext) {
+    this.context = context;
+  }
+
   private async connect() {
-    const { url, token } = socketUrl(await getSessionToken());
+    const { url, token } = socketUrl(await getSessionToken(), this.resumeSessionId);
     if (this.isClosed) return;
     const socket = new WebSocket(url, ['bearer', token]);
     this.socket = socket;
@@ -598,6 +623,7 @@ export class VoiceClient {
       }
       if (message.type === 'ready') {
         this.isReady = true;
+        if (typeof message.session_id === 'string') this.resumeSessionId = message.session_id;
         this.reconnectAttempt = 0;
         this.callbacks.onState('connected');
       }
@@ -685,6 +711,14 @@ export class VoiceClient {
 
   end() {
     const socket = this.socket;
+    if (this.isNavigating) {
+      this.isClosed = true;
+      this.isReady = false;
+      this.socket = undefined;
+      void this.audio.stop();
+      socket?.close();
+      return;
+    }
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'end' }));
     }
@@ -752,6 +786,7 @@ export class VoiceClient {
     this.isReady = false;
     this.isPaused = false;
     this.context = undefined;
+    this.resumeSessionId = undefined;
     this.socket = undefined;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

@@ -123,3 +123,157 @@ export type PatchV1MeResponses = {
 };
 
 export type PatchV1MeResponse = PatchV1MeResponses[keyof PatchV1MeResponses];
+
+export type PostV1AnalyticsEventsData = {
+  /**
+   * POST /v1/analytics/events Request body
+   */
+  body: {
+    installationId: string;
+    events: Array<{
+      id: string;
+      visitId: string;
+      eventType: "visit_started" | "active_time" | "voice_started";
+      domain: string;
+      language: string;
+      browser: string;
+      activeSeconds?: number;
+      occurredAt: string;
+    }>;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/analytics/events";
+};
+
+export type PostV1AnalyticsEventsErrors = {
+  /**
+   * POST /v1/analytics/events Negative response
+   */
+  400: {
+    status: "error";
+    error: {
+      message: string;
+    };
+  };
+};
+
+export type PostV1AnalyticsEventsError =
+  PostV1AnalyticsEventsErrors[keyof PostV1AnalyticsEventsErrors];
+
+export type PostV1AnalyticsEventsResponses = {
+  /**
+   * POST /v1/analytics/events Positive response
+   */
+  200: {
+    status: "success";
+    data: {
+      accepted: number;
+    };
+  };
+};
+
+export type PostV1AnalyticsEventsResponse =
+  PostV1AnalyticsEventsResponses[keyof PostV1AnalyticsEventsResponses];
+
+export type GetV1AdminAnalyticsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * GET /v1/admin/analytics Parameter
+     */
+    range?: "1d" | "7d" | "14d";
+  };
+  url: "/v1/admin/analytics";
+};
+
+export type GetV1AdminAnalyticsErrors = {
+  /**
+   * GET /v1/admin/analytics Negative response
+   */
+  400: {
+    status: "error";
+    error: {
+      message: string;
+    };
+  };
+};
+
+export type GetV1AdminAnalyticsError =
+  GetV1AdminAnalyticsErrors[keyof GetV1AdminAnalyticsErrors];
+
+export type GetV1AdminAnalyticsResponses = {
+  /**
+   * GET /v1/admin/analytics Positive response
+   */
+  200: {
+    status: "success";
+    data: {
+      range: "1d" | "7d" | "14d";
+      updatedAt: string;
+      metrics: Array<{
+        label: string;
+        value: string;
+        detail: string;
+        change: string;
+      }>;
+      chart: {
+        change: string;
+        points: string;
+        labels: Array<string>;
+      };
+      categories: Array<{
+        label: string;
+        value: number;
+        tone: "coral" | "red" | "violet" | "blue" | "amber" | "graphite";
+      }>;
+      sites: Array<{
+        domain: string;
+        language: string;
+        visits: string;
+        time: string;
+        share: number;
+        trend: string;
+        tone: "coral" | "red" | "violet" | "blue" | "amber" | "graphite";
+      }>;
+      locations: Array<{
+        label: string;
+        value: string;
+      }>;
+      activityByHour: Array<{
+        hour: number;
+        conversations: number;
+      }>;
+    };
+  };
+};
+
+export type GetV1AdminAnalyticsResponse =
+  GetV1AdminAnalyticsResponses[keyof GetV1AdminAnalyticsResponses];
+
+export type HeadV1AdminAnalyticsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * HEAD /v1/admin/analytics Parameter
+     */
+    range?: "1d" | "7d" | "14d";
+  };
+  url: "/v1/admin/analytics";
+};
+
+export type HeadV1AdminAnalyticsErrors = {
+  /**
+   * HEAD /v1/admin/analytics Negative response
+   */
+  400: unknown;
+};
+
+export type HeadV1AdminAnalyticsResponses = {
+  /**
+   * HEAD /v1/admin/analytics Positive response
+   */
+  200: unknown;
+};
