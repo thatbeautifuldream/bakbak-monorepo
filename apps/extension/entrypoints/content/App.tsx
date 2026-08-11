@@ -312,12 +312,12 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       const target = event.target;
       const isEditing = target instanceof HTMLElement
         && (target.isContentEditable || Boolean(target.closest('input, textarea, select, [contenteditable="true"]')));
-      if (isEditing || !event.altKey || event.ctrlKey || event.metaKey || event.key.toLowerCase() !== "b") return;
+      if (isEditing || event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.code !== "KeyB") return;
       event.preventDefault();
       setIsOpen(true);
     };
-    window.addEventListener("keydown", openWithShortcut);
-    return () => window.removeEventListener("keydown", openWithShortcut);
+    window.addEventListener("keydown", openWithShortcut, true);
+    return () => window.removeEventListener("keydown", openWithShortcut, true);
   }, []);
 
   const close = useCallback(() => {
@@ -485,6 +485,9 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       return "this page";
     }
   })();
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const shortcutLabel = isMac ? "⌥B" : "Alt+B";
+  const shortcutAriaLabel = isMac ? "Option and B" : "Alt and B";
 
   if (!isOpen) {
     if (isTucked) {
@@ -539,7 +542,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         tabIndex={-1}
         data-origin="bottom-right"
         className={`panel t-dropdown ${readingMode ? "panel-reading-mode" : ""} ${isClosing ? "is-closing" : isRevealed ? "is-open" : ""}`}
-        aria-label="Bakbak voice assistant. Press Alt and B to open this panel."
+        aria-label={`Bakbak voice assistant. Press ${shortcutAriaLabel} to open this panel.`}
         onKeyDown={(event) => event.key === "Escape" && close()}
       >
         <header className="panel-header">
@@ -627,7 +630,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
         {entries.length === 0 ? (
           <div className="empty">
-            <p>Ask about this page, or have Bakbak find and click through it. Press Alt+B any time to open Bakbak.</p>
+            <p>Ask about this page, or have Bakbak find and click through it. Press {shortcutLabel} any time to open Bakbak.</p>
           </div>
         ) : (
           <ol className="log" ref={logRef} role="list" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
