@@ -324,7 +324,7 @@ const authenticate = async (request: IncomingMessage) => {
   return Boolean(await auth.api.getSession({ headers }));
 };
 
-const voiceReconnectGraceMs = 10_000;
+const voiceReconnectGraceMs = 30_000;
 
 type VoiceTransport = {
   socket?: WebSocket;

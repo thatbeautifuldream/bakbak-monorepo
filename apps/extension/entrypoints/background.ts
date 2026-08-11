@@ -7,9 +7,13 @@ const ANALYTICS_QUEUE_KEY = 'bakbak:analytics-queue';
 const MAX_ANALYTICS_QUEUE_SIZE = 500;
 const ANALYTICS_BATCH_SIZE = 25;
 const OFFSCREEN_DOCUMENT = 'offscreen.html';
+const VOICE_SESSION_KEY_PREFIX = 'bakbak:voice-navigation:';
+const VOICE_SESSION_TTL_MS = 25_000;
 
 let creatingOffscreen: Promise<void> | undefined;
 let microphoneSession: { captureId: string; tabId: number } | undefined;
+
+const voiceSessionKey = (tabId: number) => `${VOICE_SESSION_KEY_PREFIX}${tabId}`;
 
 const getSessionToken = async () => {
   const cookie = await browser.cookies.get({ url: WEB_URL, name: SESSION_COOKIE });
@@ -115,6 +119,37 @@ async function handle(request: Request, sender: { tab?: { id?: number }; url?: s
       const token = await getSessionToken();
       if (!token) throw new Error(`Sign in at ${WEB_URL} to use voice chat`);
       return token;
+    }
+    case 'voice-session-save': {
+      const tabId = sender.tab?.id;
+      if (typeof tabId !== 'number') throw new Error('Voice navigation must originate from a browser tab.');
+      await browser.storage.session.set({
+        [voiceSessionKey(tabId)]: {
+          sessionId: request.sessionId,
+          expiresAt: Date.now() + VOICE_SESSION_TTL_MS,
+        },
+      });
+      return undefined;
+    }
+    case 'voice-session-take': {
+      const tabId = sender.tab?.id;
+      if (typeof tabId !== 'number') return undefined;
+      const key = voiceSessionKey(tabId);
+      const stored = await browser.storage.session.get(key);
+      await browser.storage.session.remove(key);
+      const value = stored[key];
+      if (
+        !value
+        || typeof value !== 'object'
+        || !('sessionId' in value)
+        || !('expiresAt' in value)
+        || typeof value.sessionId !== 'string'
+        || typeof value.expiresAt !== 'number'
+        || value.expiresAt < Date.now()
+      ) {
+        return undefined;
+      }
+      return value.sessionId;
     }
     case 'analytics-events':
       await queueAnalyticsEvents(request.events);

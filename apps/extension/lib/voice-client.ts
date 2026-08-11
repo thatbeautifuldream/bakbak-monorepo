@@ -1,6 +1,6 @@
 import { BrowserAudioInterface } from 'sarvam-conv-ai-sdk/browser';
 import { API_URL } from './config';
-import { send } from './messages';
+import { saveVoiceSessionForNavigation, send } from './messages';
 
 type VoiceMessage = {
   type: string;
@@ -455,6 +455,13 @@ export async function executeWebsiteTool(
       if (element.matches('button[type="submit"], input[type="submit"]')) {
         return { error: 'Submitting forms by voice is not enabled.' };
       }
+      const link = element.closest('a[href]');
+      if (link instanceof HTMLAnchorElement && !link.download && link.target !== '_blank') {
+        const url = new URL(link.href, location.href);
+        if (['http:', 'https:'].includes(url.protocol)) {
+          return { ok: true, element_id: elementId, navigation_url: url.href };
+        }
+      }
       element.click();
       return { ok: true, element_id: elementId };
     }
@@ -507,7 +514,6 @@ export async function executeWebsiteTool(
       if (!url || !['http:', 'https:'].includes(url.protocol)) {
         return { error: 'Only HTTP and HTTPS pages can be opened.' };
       }
-      location.assign(url.href);
       return { ok: true, url: url.href };
     }
     case 'go_back':
@@ -566,6 +572,7 @@ export class VoiceClient {
   private isPaused = false;
   private context?: WebsiteContext;
   private resumeSessionId?: string;
+  private isNavigating = false;
   private reconnectAttempt = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingAcknowledgement?: {
@@ -577,16 +584,30 @@ export class VoiceClient {
 
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
-  async start(context: WebsiteContext) {
+  async start(context: WebsiteContext, resumeSessionId?: string) {
     this.context = context;
     this.isClosed = false;
     this.isPaused = false;
     this.isReady = false;
-    this.resumeSessionId = undefined;
+    this.isNavigating = false;
+    this.resumeSessionId = resumeSessionId;
     this.reconnectAttempt = 0;
-    this.callbacks.onState('connecting');
+    this.callbacks.onState(resumeSessionId ? 'reconnecting' : 'connecting');
     await this.connect();
     if (!this.isClosed) await this.startAudioCapture();
+  }
+
+  async prepareForNavigation() {
+    if (this.isClosed || !this.isReady || !this.resumeSessionId) return false;
+    await saveVoiceSessionForNavigation(this.resumeSessionId);
+    this.isNavigating = true;
+    await this.audio.stop();
+    this.callbacks.onLevel?.(0);
+    return true;
+  }
+
+  updateContext(context: WebsiteContext) {
+    this.context = context;
   }
 
   private async connect() {
@@ -690,6 +711,14 @@ export class VoiceClient {
 
   end() {
     const socket = this.socket;
+    if (this.isNavigating) {
+      this.isClosed = true;
+      this.isReady = false;
+      this.socket = undefined;
+      void this.audio.stop();
+      socket?.close();
+      return;
+    }
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'end' }));
     }

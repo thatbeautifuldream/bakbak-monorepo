@@ -17,7 +17,7 @@ import {
 } from "@heroicons/react/16/solid";
 import type { ContentScriptContext } from "#imports";
 import { trackVoiceStarted } from "@/lib/analytics";
-import { openLogin } from "@/lib/messages";
+import { openLogin, takeVoiceSessionForNavigation } from "@/lib/messages";
 import {
   describeWebsiteTool,
   executeWebsiteTool,
@@ -197,6 +197,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const panelRef = useRef<HTMLElement>(null);
   const logRef = useRef<HTMLOListElement>(null);
   const voiceRef = useRef<VoiceClient | undefined>(undefined);
+  const startRef = useRef<(resumeSessionId?: string) => Promise<void>>(async () => undefined);
   const entryId = useRef(0);
   const inactivityLanguage = useRef<InactivityLanguage>(languageFromBrowser());
   const voiceStartTracked = useRef(false);
@@ -250,10 +251,13 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       setWebsiteSafety(getWebsiteSafety());
       setTranslation(null);
       setNewsTrust(null);
+      const client = voiceRef.current;
+      if (client) {
+        setTimeout(() => client.updateContext(getWebsiteContext()), 0);
+        return;
+      }
       setEntries([]);
       setError(null);
-      voiceRef.current?.end();
-      voiceRef.current = undefined;
       setVoiceState("idle");
       setSeconds(0);
     });
@@ -346,7 +350,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     setError(null);
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (resumeSessionId?: string) => {
     setError(null);
     setWebsiteSafety(getWebsiteSafety());
     wasReconnecting.current = false;
@@ -414,7 +418,27 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           const action = describeWebsiteTool(toolName, args);
           if (action) append("action", action);
           void executeWebsiteTool(toolName, args)
-            .then((result) => client.sendToolResult(toolName, result, message.request_id))
+            .then(async (result) => {
+              const navigationUrl = "navigation_url" in result && typeof result.navigation_url === "string"
+                ? result.navigation_url
+                : toolName === "navigate_to_page" && "url" in result && typeof result.url === "string"
+                  ? result.url
+                  : undefined;
+              if ("ok" in result && result.ok === true && navigationUrl) {
+                if (!(await client.prepareForNavigation())) {
+                  client.sendToolResult(
+                    toolName,
+                    { error: "The voice session could not be preserved for navigation." },
+                    message.request_id,
+                  );
+                  return;
+                }
+                client.sendToolResult(toolName, result, message.request_id);
+                setTimeout(() => location.assign(navigationUrl), 100);
+                return;
+              }
+              client.sendToolResult(toolName, result, message.request_id);
+            })
             .catch((error) =>
               client.sendToolResult(
                 toolName,
@@ -432,7 +456,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     });
     voiceRef.current = client;
     try {
-      await client.start(getWebsiteContext());
+      await client.start(getWebsiteContext(), resumeSessionId);
     } catch (cause) {
       client.end();
       voiceRef.current = undefined;
@@ -442,6 +466,17 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         : cause instanceof Error ? cause.message : String(cause));
     }
   }, [append, voiceState]);
+  startRef.current = start;
+
+  useEffect(() => {
+    let cancelled = false;
+    void takeVoiceSessionForNavigation().then((resumeSessionId) => {
+      if (!cancelled && resumeSessionId && !voiceRef.current) void startRef.current(resumeSessionId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const hostname = (() => {
     try {
