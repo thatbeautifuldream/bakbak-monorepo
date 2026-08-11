@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { fromNodeHeaders } from "better-auth/node";
 import { bearer, oAuthProxy } from "better-auth/plugins";
@@ -53,6 +54,15 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async () => {
+          throw new APIError("BAD_REQUEST", { message: "Signup is disabled" });
+        },
+      },
+    },
   },
   socialProviders: googleProvider,
   plugins: [oAuthProxy(), bearer()],

@@ -1,206 +1,111 @@
-# Monorepo Template
+# Bakbak
 
-A production-ready TypeScript monorepo with authentication, type-safe API, and a modern frontend. Drop in your domain and ship.
+Talk to any webpage. Bakbak is a browser extension that lets you ask questions out loud about the page you are already reading — no copy-pasting into another tool, no switching tabs, no losing your place.
+
+| | |
+|---|---|
+| **GitHub repository** | [github.com/thatbeautifuldream/bakbak-monorepo](https://github.com/thatbeautifuldream/bakbak-monorepo) |
+| **Use the app** | [bakbak.milind.fyi](https://bakbak.milind.fyi) |
+| **Download the extension** | [extension-0.0.1-chrome.zip](https://github.com/thatbeautifuldream/bakbak-monorepo/releases/download/v0.0.1/extension-0.0.1-chrome.zip) ([all releases](https://github.com/thatbeautifuldream/bakbak-monorepo/releases)) |
+| **Demo video** | [youtube.com/watch?v=8B5bvayecUE](https://youtube.com/watch?v=8B5bvayecUE) |
+| **Project presentation** | [Google Slides](https://docs.google.com/presentation/d/17kgML2jneAO4WNiy7rYoZtj7M64NwryWkKyrr4y_oNM/edit?usp=sharing) |
+| **API** | [bakbak-api.milind.fyi](https://bakbak-api.milind.fyi) · [docs](https://bakbak-api.milind.fyi/docs) |
+
+## Install
+
+Bakbak is not on the Chrome Web Store yet, so it installs as an unpacked extension:
+
+1. Download the zip and unzip it
+2. Open `chrome://extensions` and turn on Developer mode
+3. Drag the unzipped folder onto that page
+
+Then sign in at [bakbak.milind.fyi](https://bakbak.milind.fyi). The extension reuses that session — there is no separate extension login.
+
+## What it does
+
+- Ask for explanations, summaries, or specific details from the page in front of you, out loud
+- Reads the page's content, headings, links, metadata, selected text, and accessible controls for context
+- Answers in voice, in real time, with a running transcript in the panel
+- Can scroll, follow links, go back, click safe controls, and fill text fields on your behalf — every action is written into the transcript
+- Never submits forms by voice
+- The microphone opens only when you start a conversation, and stops the moment you end it
+
+Because the voice layer is multilingual, it also makes the web more legible across languages — a Tamil speaker can listen to and understand a Gujarati news page without reading Gujarati.
 
 ## Stack
 
 | Layer | Tool |
 |---|---|
 | Monorepo | Turborepo + Bun workspaces |
-| API | Express 5 + express-zod-api v27 |
-| Auth | Better Auth (email/password + OAuth) |
-| Database | PostgreSQL + Drizzle ORM (Neon serverless) |
-| Frontend | Next.js 16 + React 19 + Tailwind CSS v4 |
-| Type Safety | Hey API (OpenAPI → TypeScript + React Query) |
-| Queries | TanStack React Query |
+| Extension | WXT + React |
+| Website | Next.js 16 + React 19 + Tailwind CSS v4 |
+| API | Express 5 + express-zod-api |
+| Auth | Better Auth (email/password + Google) |
+| Database | PostgreSQL + Drizzle ORM |
+| Voice | Sarvam Conversational AI |
+| Type safety | Hey API (OpenAPI → typed SDK + React Query) |
 
-## Quick Start
+## Run it locally
 
 ```bash
-# 1. Install dependencies
 bun install
 
-# 2. Set up environment variables
 cp apps/api/.env.example apps/api/.env
 cp apps/website/.env.example apps/website/.env
-# Fill in the values in both .env files
+# fill in the values in both .env files
 
-# 3. Generate and run database migrations
 bun run db:generate
 bun run db:migrate
 
-# 4. Start development servers
 bun run dev
 ```
 
-- API: http://localhost:3000
-- API Docs: http://localhost:3000/docs
-- Website: http://localhost:3001
+- API — http://localhost:3000 (docs at `/docs`)
+- Website — http://localhost:3001
+- Extension — `bun --filter extension dev` opens a browser with it loaded
 
-## Architecture
-
-```
-packages/typescript-config/   Shared TypeScript base configs
-packages/eslint-config/       Shared ESLint flat configs
-
-apps/api/                     Express REST API + Better Auth + Drizzle
-  src/
-    index.ts                  Entry point, Express server
-    auth.ts                   Better Auth config + middleware factories
-    routing.ts                express-zod-api route tree
-    generate-openapi.ts       Build-time OpenAPI spec generation
-    db/schema.ts              Drizzle table definitions
-    endpoints/                REST endpoint handlers
-    lib/                      Shared API utilities
-
-apps/website/                 Next.js 16 frontend
-  app/                        App Router pages
-    login/                    Sign in
-    signup/                   Sign up
-    dashboard/                Protected page (auth guard)
-  client/                     AUTO-GENERATED — do not edit
-    sdk.gen.ts                Typed fetch functions (from OpenAPI)
-    types.gen.ts              TypeScript types (from OpenAPI)
-    @tanstack/                React Query hooks + query keys
-  lib/
-    auth-client.ts            Better Auth client (signIn, signUp, useSession)
-    api/client-config.ts      Hey API client setup (base URL, error interceptor)
-    api/error.ts              ApiError class
-    react-query/              Query & mutation option factories (QO, MO)
-  components/
-    query-provider.tsx        React Query + API client initialization
-    theme-provider.tsx        Dark/light theme (next-themes)
-```
-
-## Build Pipeline
+## Repository layout
 
 ```
-packages/typescript-config  →  apps/api extends base.json
-apps/api build              →  generates docs/openapi.json
-                                ↳
-apps/website build          →  openapi-ts reads openapi.json
-                                → generates client/ (SDK + types + React Query hooks)
-                                → next build
+apps/api/          Express REST API, Better Auth, Drizzle schema, voice WebSocket
+apps/website/      Next.js app — marketing page, auth, dashboard
+apps/extension/    WXT browser extension (content script + background worker)
+packages/api-client/   Typed SDK generated from the API's OpenAPI spec
 ```
 
-Turbo enforces topological order: shared packages build first, then API, then website.
+`AGENTS.md` documents the working conventions — how endpoints, migrations, and the generated client fit together.
 
-## How to Add a New Endpoint
-
-### 1. Create the endpoint — group by resource (`apps/api/src/endpoints/<resource>.ts`)
-
-```typescript
-// apps/api/src/endpoints/items.ts
-import { z } from "zod";
-import { authenticatedEndpointsFactory } from "../auth.js";
-
-export const listItemsEndpoint = authenticatedEndpointsFactory.build({
-  method: "get",
-  input: z.object({}),
-  output: z.object({ items: z.array(z.object({ id: z.string(), name: z.string() })) }),
-  handler: async ({ ctx }) => {
-    return { items: [] };
-  },
-});
-```
-
-### 2. Register in the route tree (`apps/api/src/routing.ts`)
-
-```typescript
-import { listItemsEndpoint } from "./endpoints/items.js";
-
-export const routing = {
-  v1: {
-    me: { ... },
-    items: {
-      get: listItemsEndpoint,
-    },
-  },
-};
-```
-
-### 3. Rebuild the API to regenerate the OpenAPI spec
-
-```bash
-bun --filter api build
-```
-
-### 4. Generate the client types
-
-```bash
-bun --filter website generate-client
-```
-
-### 5. Use in the frontend
-
-```typescript
-// Query option
-import { getV1ItemsOptions } from "@/client/@tanstack/react-query.gen";
-import type { GetV1ItemsResponse } from "@/client/types.gen";
-
-const query = useQuery({
-  ...getV1ItemsOptions(),
-  select: (r: GetV1ItemsResponse) => r.data,
-});
-```
-
-## How to Add a DB Table
-
-### 1. Define the table in `apps/api/src/db/schema.ts`
-
-```typescript
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
-
-export const items = pgTable("items", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-```
-
-### 2. Generate and apply the migration
-
-```bash
-bun run db:generate
-bun run db:migrate
-```
-
-## Environment Variables
+## Environment variables
 
 ### API (`apps/api/.env`)
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string (Neon) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `BETTER_AUTH_SECRET` | Yes | Secret key for auth |
-| `BETTER_AUTH_URL` | Yes | API base URL (default: `http://localhost:3000`) |
+| `BETTER_AUTH_URL` | Yes | API base URL |
 | `TRUSTED_ORIGINS` | Yes | Comma-separated allowed origins |
-| `WEB_APP_URL` | Yes | Frontend URL for callbacks |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `WEB_APP_URL` | Yes | Website URL, used for OAuth callbacks |
 | `SARVAM_CONVERSATIONS_API_KEY` | Yes for voice | Sarvam Conversations API key |
 | `SARVAM_VOICE_AGENT_ID` | Yes for voice | Sarvam voice-agent app ID |
 | `SARVAM_ORG_ID` | Yes for voice | Sarvam organization ID |
 | `SARVAM_WORKSPACE_ID` | Yes for voice | Sarvam workspace ID |
 | `SARVAM_TOOL_SECRET` | Yes for browser tools | Bearer secret configured on Sarvam API tools |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | No | Google sign-in |
 
 ### Website (`apps/website/.env`)
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | Yes | API URL (default: `http://localhost:3000`) |
+| `API_URL` | Yes | Where `/api/auth/*` and `/api/proxy/*` are forwarded, read per request |
+| `NEXT_PUBLIC_API_URL` | No | API URL used during server rendering |
 
-## Key Patterns
+### Extension
 
-### Cross-Origin Auth
+Defaults to the production API and website. Override with `WXT_API_URL` and `WXT_WEB_URL` in `apps/extension/.env`.
 
-The website rewrites `/api/auth/*` and `/api/proxy/*` to the API via Next.js config. This is required for iOS Safari compatibility — direct cross-origin fetch silently drops cookies.
+## How auth works
 
-### Type Safety Pipeline
+The browser talks to the API through the website's own origin — `proxy.ts` forwards `/api/auth/*` and `/api/proxy/*` to `API_URL` at request time. Same-origin keeps the session cookie alive on iOS Safari, where a direct cross-origin fetch drops it.
 
-API endpoints are defined with `express-zod-api` using Zod schemas for input/output. The OpenAPI spec is generated at build time. The website uses `@hey-api/openapi-ts` to generate a fully typed SDK + React Query hooks from that spec. No manual type definitions needed.
-
-### Auth Middleware
-
-`authenticatedEndpointsFactory` validates the session and injects `ctx.authUser` / `ctx.authSession`. All protected endpoints use this factory. Extend with additional middleware for roles/permissions.
+The extension has no login of its own. Its background worker reads the session cookie the website already set and sends it as a bearer token, so signing in on the website signs you in everywhere.

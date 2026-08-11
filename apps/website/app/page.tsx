@@ -3,11 +3,17 @@ import Link from "next/link"
 import {
   RiArrowRightLine,
   RiCornerDownRightLine,
+  RiDownloadLine,
   RiMicLine,
   RiStopFill,
 } from "@remixicon/react"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import {
+  EXTENSION_DOWNLOAD_URL,
+  EXTENSION_VERSION,
+  INSTALL_STEPS,
+} from "@/lib/extension"
 
 export const metadata: Metadata = {
   title: "Bakbak · Talk to the web",
@@ -113,17 +119,40 @@ export default function LandingPage() {
               you, so a question, a thought, or a useful detail is always within
               reach.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
+                <a href={EXTENSION_DOWNLOAD_URL}>
+                  Download for Chrome
+                  <RiDownloadLine />
+                </a>
+              </Button>
+              <Button asChild size="lg" variant="secondary">
                 <Link href="/login">
-                  Start a conversation
+                  Sign in
                   <RiArrowRightLine />
                 </Link>
               </Button>
-              <p className="text-sm text-muted-foreground">
-                Your mic only starts when you choose to speak.
-              </p>
             </div>
+
+            <ol
+              role="list"
+              className="mt-8 flex flex-col gap-2 border-t border-border pt-6"
+            >
+              {INSTALL_STEPS.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex gap-2.5 text-base/7 text-pretty text-muted-foreground sm:text-sm/6"
+                >
+                  <span className="font-mono tabular-nums">{index + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+
+            <p className="mt-6 text-base/7 text-muted-foreground sm:text-sm/6">
+              Version {EXTENSION_VERSION}. Your mic only starts when you choose
+              to speak.
+            </p>
           </div>
 
           <div className="justify-self-center lg:justify-self-end">
