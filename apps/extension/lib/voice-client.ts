@@ -33,7 +33,7 @@ export type WebsiteContext = {
 
 export type WebsiteSafety = {
   isSensitive: boolean;
-  reason?: "financial" | "identity" | "credential";
+  reason?: "financial" | "identity";
 };
 
 export type TranslationView = {
@@ -84,8 +84,10 @@ const sectionSelector = [
 
 const sensitiveHostnamePattern = /(^|\.)(axisbank|bankofbaroda|canarabank|cred|federalbank|gpay|groww|hdfcbank|icicibank|idfcfirstbank|indusind|kotak|onlinesbi|paytm|phonepe|pnbindia|rblbank|sbi|yesbank|zerodha)\./i;
 const identityHostnamePattern = /(^|\.)(digilocker|incometax|uidai)\.gov\.in$/i;
-const sensitiveFieldPattern = /aadhaar|aadhar|account.?number|card.?number|cvv|debit.?card|credit.?card|ifsc|net.?banking|one.?time.?password|otp|pan.?number|password|pin|upi.?pin/i;
+const sensitiveFieldPattern = /\b(?:aadhaar|aadhar|account[\s_-]*number|card[\s_-]*number|cvv|debit[\s_-]*card|credit[\s_-]*card|ifsc|net[\s_-]*banking|one[\s_-]*time[\s_-]*password|otp|pan[\s_-]*number|password|pin|upi[\s_-]*pin)\b/i;
+const sensitiveAutocompleteValues = new Set(['cc-number', 'cc-csc', 'cc-exp', 'cc-exp-month', 'cc-exp-year', 'one-time-code']);
 const safeModeMessage = "Sensitive page detected. Bakbak is in read-only mode and does not share page text or perform browser actions here.";
+const sensitiveFieldMessage = 'Bakbak does not enter or interact with passwords, OTPs, card details, PINs, or identity numbers.';
 
 const highlightedElements = new Map<HTMLElement, Record<string, { value: string; priority: string }>>();
 let clearHighlightTimer: ReturnType<typeof setTimeout> | undefined;
@@ -96,31 +98,31 @@ const isVisible = (element: Element) => {
   return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
 };
 
-const getSensitiveFieldText = () =>
-  Array.from(document.querySelectorAll('input, textarea, select, label'))
-    .map((element) => [
+const getFormControlText = (element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) =>
+  [
       element.getAttribute('aria-label'),
       element.getAttribute('autocomplete'),
       element.getAttribute('id'),
       element.getAttribute('name'),
       element.getAttribute('placeholder'),
-      element.textContent,
-    ].filter(Boolean).join(' '))
-    .join(' ');
+      ...Array.from(element.labels ?? []).filter(isVisible).map((label) => label.textContent),
+  ].filter(Boolean).join(' ');
+
+const isSensitiveFormControl = (element: Element) => {
+  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
+    return false;
+  }
+  return (element instanceof HTMLInputElement && (element.type === 'password' || sensitiveAutocompleteValues.has(element.autocomplete)))
+    || sensitiveFieldPattern.test(getFormControlText(element));
+};
 
 export const getWebsiteSafety = (): WebsiteSafety => {
   const hostname = location.hostname;
-  const sensitiveFieldText = getSensitiveFieldText();
-  const hasCredentialField = Boolean(document.querySelector('input[type="password"], input[autocomplete="one-time-code"], input[autocomplete="cc-number"]'));
-  const hasSensitiveField = sensitiveFieldPattern.test(sensitiveFieldText);
-  if (identityHostnamePattern.test(hostname) || /aadhaar|aadhar|pan.?number/i.test(sensitiveFieldText)) {
+  if (identityHostnamePattern.test(hostname)) {
     return { isSensitive: true, reason: 'identity' };
   }
   if (sensitiveHostnamePattern.test(hostname)) {
     return { isSensitive: true, reason: 'financial' };
-  }
-  if (hasCredentialField || hasSensitiveField) {
-    return { isSensitive: true, reason: 'credential' };
   }
   return { isSensitive: false };
 };
@@ -413,6 +415,9 @@ export async function executeWebsiteTool(
         if (!(element instanceof HTMLElement)) {
           return { error: 'Element not found. Ask the user to restate the target.' };
         }
+        if (isSensitiveFormControl(element)) {
+          return { error: sensitiveFieldMessage };
+        }
         if (element.matches('button[type="submit"], input[type="submit"]')) {
           return { error: 'Submitting forms by voice is not enabled.' };
         }
@@ -444,6 +449,7 @@ export async function executeWebsiteTool(
       const elementId = typeof args.element_id === 'string' ? args.element_id : '';
       const element = document.querySelector(`[data-bakbak-id="${CSS.escape(elementId)}"]`);
       if (!(element instanceof HTMLElement)) return { error: 'Element not found. Refresh the accessibility tree.' };
+      if (isSensitiveFormControl(element)) return { error: sensitiveFieldMessage };
       if (element.matches('button[type="submit"], input[type="submit"]')) {
         return { error: 'Submitting forms by voice is not enabled.' };
       }
@@ -458,6 +464,7 @@ export async function executeWebsiteTool(
       if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
         return { error: 'Element is not a text input. Refresh the accessibility tree.' };
       }
+      if (isSensitiveFormControl(element)) return { error: sensitiveFieldMessage };
       element.value = value;
       element.dispatchEvent(new Event('input', { bubbles: true }));
       element.dispatchEvent(new Event('change', { bubbles: true }));
