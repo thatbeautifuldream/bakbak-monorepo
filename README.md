@@ -4,9 +4,11 @@ Talk to any webpage. Bakbak is a browser extension that lets you ask questions o
 
 | | |
 |---|---|
+| **GitHub repository** | [github.com/thatbeautifuldream/bakbak-monorepo](https://github.com/thatbeautifuldream/bakbak-monorepo) |
 | **Use the app** | [bakbak.milind.fyi](https://bakbak.milind.fyi) |
 | **Download the extension** | [extension-0.0.1-chrome.zip](https://github.com/thatbeautifuldream/bakbak-monorepo/releases/download/v0.0.1/extension-0.0.1-chrome.zip) ([all releases](https://github.com/thatbeautifuldream/bakbak-monorepo/releases)) |
 | **Demo video** | [youtube.com/watch?v=8B5bvayecUE](https://youtube.com/watch?v=8B5bvayecUE) |
+| **Project presentation** | [Google Slides](https://docs.google.com/presentation/d/17kgML2jneAO4WNiy7rYoZtj7M64NwryWkKyrr4y_oNM/edit?usp=sharing) |
 | **API** | [bakbak-api.milind.fyi](https://bakbak-api.milind.fyi) · [docs](https://bakbak-api.milind.fyi/docs) |
 
 ## Install
@@ -84,7 +86,11 @@ packages/api-client/   Typed SDK generated from the API's OpenAPI spec
 | `BETTER_AUTH_URL` | Yes | API base URL |
 | `TRUSTED_ORIGINS` | Yes | Comma-separated allowed origins |
 | `WEB_APP_URL` | Yes | Website URL, used for OAuth callbacks |
-| `SARVAM_*` | Yes | Sarvam org, workspace, agent, and API keys |
+| `SARVAM_CONVERSATIONS_API_KEY` | Yes for voice | Sarvam Conversations API key |
+| `SARVAM_VOICE_AGENT_ID` | Yes for voice | Sarvam voice-agent app ID |
+| `SARVAM_ORG_ID` | Yes for voice | Sarvam organization ID |
+| `SARVAM_WORKSPACE_ID` | Yes for voice | Sarvam workspace ID |
+| `SARVAM_TOOL_SECRET` | Yes for browser tools | Bearer secret configured on Sarvam API tools |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | No | Google sign-in |
 
 ### Website (`apps/website/.env`)

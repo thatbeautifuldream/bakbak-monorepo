@@ -8,6 +8,9 @@ export default defineConfig({
       port: 3002,
     },
   },
+  webExt: {
+    startUrls: ['http://localhost:3001'],
+  },
   manifest: {
     name: 'Bakbak',
     description: 'Listen to any page. Narrated with Sarvam voices.',

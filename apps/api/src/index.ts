@@ -7,7 +7,7 @@ import { toNodeHandler } from "better-auth/node";
 import { routing } from "./routing.js";
 import { auth } from "./auth.js";
 import { mkdirSync, writeFileSync } from "fs";
-import { attachVoiceWebSocket } from "./lib/voice.js";
+import { attachVoiceWebSocket, browserToolRequestHandler } from "./lib/voice.js";
 
 const appName = process.env.APP_NAME ?? "MyApp";
 
@@ -45,6 +45,11 @@ const config = {
       }),
     );
     app.all("/api/auth/*splat", toNodeHandler(auth));
+    app.post(
+      "/v1/voice-tools/execute",
+      express.json({ limit: "1mb", type: "*/*" }),
+      browserToolRequestHandler,
+    );
 
     const documentation = new Documentation({
       routing,

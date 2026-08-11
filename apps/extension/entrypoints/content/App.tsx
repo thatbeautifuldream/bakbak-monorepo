@@ -11,6 +11,7 @@ import {
   ExclamationTriangleIcon,
   MicrophoneIcon,
   MinusIcon,
+  PauseIcon,
   StopIcon,
   XMarkIcon,
 } from "@heroicons/react/16/solid";
@@ -23,17 +24,58 @@ import {
   VoiceClient,
 } from "@/lib/voice-client";
 
-type VoiceState = "idle" | "connecting" | "connected";
+type VoiceState = "idle" | "connecting" | "connected" | "paused";
 type Entry = { id: number; kind: "user" | "agent" | "action"; text: string };
 
 const CLOSE_MS = 150;
 const METER_BARS = 5;
 const TUCK_KEY = "bakbak:tucked";
 
+const inactivityMessages = {
+  en: "I haven't heard a response, so this session has ended. I'm here whenever you're ready — press Start to talk again.",
+  as: "কিছু সময় ধৰি আপোনাৰ কোনো উত্তৰ পোৱা হোৱা নাই, সেয়ে এই ছেছন শেষ হৈছে। আপুনি সাজু হ’লে কথা পাতিবলৈ Start টিপক।",
+  bn: "কিছু সময় ধরে আপনার কোনো উত্তর পাইনি, তাই এই সেশনটি শেষ হয়েছে। আপনি প্রস্তুত হলে কথা বলতে Start চাপুন।",
+  gu: "થોડા સમયથી તમારો કોઈ જવાબ મળ્યો નથી, તેથી આ સેશન સમાપ્ત થયું છે. જ્યારે તમે તૈયાર હો, ત્યારે વાત કરવા Start દબાવો.",
+  hi: "मुझे कुछ देर से आपका कोई जवाब नहीं मिला, इसलिए यह सत्र समाप्त हो गया है। जब भी आप तैयार हों, बात करने के लिए Start दबाएँ।",
+  kn: "ಸ್ವಲ್ಪ ಸಮಯದಿಂದ ನಿಮ್ಮಿಂದ ಪ್ರತಿಕ್ರಿಯೆ ಬಂದಿಲ್ಲ, ಆದ್ದರಿಂದ ಈ ಸೆಷನ್ ಮುಗಿದಿದೆ. ನೀವು ಸಿದ್ಧರಾದಾಗ ಮಾತನಾಡಲು Start ಒತ್ತಿರಿ.",
+  ml: "കുറച്ച് സമയമായി നിങ്ങളിൽ നിന്ന് മറുപടി ലഭിച്ചില്ല, അതിനാൽ ഈ സെഷൻ അവസാനിച്ചു. നിങ്ങൾ തയ്യാറാകുമ്പോൾ സംസാരിക്കാൻ Start അമർത്തുക.",
+  mr: "मला काही वेळापासून तुमच्याकडून प्रतिसाद मिळाला नाही, त्यामुळे हे सत्र संपले आहे. तुम्ही तयार झाल्यावर बोलण्यासाठी Start दाबा.",
+  ne: "केही समयदेखि तपाईंको कुनै प्रतिक्रिया आएको छैन, त्यसैले यो सत्र समाप्त भएको छ। तपाईं तयार हुँदा कुरा गर्न Start थिच्नुहोस्।",
+  od: "କିଛି ସମୟ ଧରି ଆପଣଙ୍କଠାରୁ କୌଣସି ଉତ୍ତର ମିଳିନାହିଁ, ତେଣୁ ଏହି ସେସନ୍ ଶେଷ ହୋଇଛି। ଆପଣ ପ୍ରସ୍ତୁତ ହେଲେ କଥା ହେବାକୁ Start ଦବାନ୍ତୁ।",
+  pa: "ਮੈਨੂੰ ਕੁਝ ਸਮੇਂ ਤੋਂ ਤੁਹਾਡਾ ਕੋਈ ਜਵਾਬ ਨਹੀਂ ਮਿਲਿਆ, ਇਸ ਲਈ ਇਹ ਸੈਸ਼ਨ ਖਤਮ ਹੋ ਗਿਆ ਹੈ। ਜਦੋਂ ਤੁਸੀਂ ਤਿਆਰ ਹੋਵੋ, ਗੱਲ ਕਰਨ ਲਈ Start ਦਬਾਓ।",
+  ta: "சில நேரமாக உங்களிடமிருந்து பதில் வரவில்லை, அதனால் இந்த அமர்வு முடிந்தது. நீங்கள் தயாரானதும் பேச Start-ஐ அழுத்தவும்.",
+  te: "కొంతసేపటి నుంచి మీ నుంచి స్పందన రాలేదు, కాబట్టి ఈ సెషన్ ముగిసింది. మీరు సిద్ధమైనప్పుడు మాట్లాడటానికి Start నొక్కండి.",
+  ur: "کچھ دیر سے آپ کی طرف سے کوئی جواب نہیں ملا، اس لیے یہ سیشن ختم ہو گیا ہے۔ جب آپ تیار ہوں تو بات کرنے کے لیے Start دبائیں۔",
+} as const;
+
+type InactivityLanguage = keyof typeof inactivityMessages;
+
+const languageFromBrowser = () =>
+  [...navigator.languages, navigator.language]
+    .map((language) => language?.toLowerCase().split("-")[0])
+    .find((language): language is InactivityLanguage => typeof language === "string" && language in inactivityMessages) ?? "en";
+
+const languageFromText = (text: string, fallback: InactivityLanguage) => {
+  if (/[\u0A00-\u0A7F]/.test(text)) return "pa";
+  if (/[\u0A80-\u0AFF]/.test(text)) return "gu";
+  if (/[\u0B00-\u0B7F]/.test(text)) return "od";
+  if (/[\u0B80-\u0BFF]/.test(text)) return "ta";
+  if (/[\u0C00-\u0C7F]/.test(text)) return "te";
+  if (/[\u0C80-\u0CFF]/.test(text)) return "kn";
+  if (/[\u0D00-\u0D7F]/.test(text)) return "ml";
+  if (/[\u0980-\u09FF]/.test(text)) return fallback === "as" ? "as" : "bn";
+  if (/[\u0900-\u097F]/.test(text)) {
+    return fallback === "mr" || fallback === "ne" ? fallback : "hi";
+  }
+  if (/[\u0600-\u06FF]/.test(text)) return "ur";
+  return fallback;
+};
+
 const stateLabel: Record<VoiceState, string> = {
   idle: "Ready",
   connecting: "Connecting",
   connected: "Listening",
+  paused: "Paused",
 };
 
 const formatDuration = (seconds: number) =>
@@ -130,6 +172,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const logRef = useRef<HTMLOListElement>(null);
   const voiceRef = useRef<VoiceClient | undefined>(undefined);
   const entryId = useRef(0);
+  const inactivityLanguage = useRef<InactivityLanguage>(languageFromBrowser());
   const levelListener = useRef<((level: number) => void) | undefined>(
     undefined,
   );
@@ -142,6 +185,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   }, []);
 
   const isLive = voiceState === "connected";
+  const isPaused = voiceState === "paused";
+  const hasConversation = isLive || isPaused;
 
   const append = useCallback((kind: Entry["kind"], text: string) => {
     setEntries((current) => {
@@ -166,7 +211,6 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
   useEffect(() => {
     if (!isLive) return;
-    setSeconds(0);
     const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
     return () => clearInterval(timer);
   }, [isLive]);
@@ -176,13 +220,14 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       setTitle(document.title || "Untitled page");
       setEntries([]);
       setError(null);
-      voiceRef.current?.stop();
+      voiceRef.current?.end();
       voiceRef.current = undefined;
       setVoiceState("idle");
+      setSeconds(0);
     });
   }, [ctx]);
 
-  useEffect(() => () => voiceRef.current?.stop(), []);
+  useEffect(() => () => voiceRef.current?.end(), []);
 
   useEffect(() => {
     void browser.storage.local
@@ -204,29 +249,82 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     }, CLOSE_MS);
   }, []);
 
-  const stop = useCallback(() => {
-    voiceRef.current?.stop();
+  const pause = useCallback(async () => {
+    const client = voiceRef.current;
+    if (!client) return;
+    setError(null);
+    try {
+      await client.pause();
+    } catch (cause) {
+      client.end();
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, []);
+
+  const endConversation = useCallback(() => {
+    voiceRef.current?.end();
     voiceRef.current = undefined;
     setVoiceState("idle");
+    setEntries([]);
+    setSeconds(0);
+    setError(null);
   }, []);
 
   const start = useCallback(async () => {
     setError(null);
-    const client = new VoiceClient({
-      onState: (state) =>
-        setVoiceState(state === "closed" ? "idle" : state),
+    const existingClient = voiceRef.current;
+    if (voiceState === "paused" && existingClient) {
+      try {
+        await existingClient.resume();
+      } catch (cause) {
+        existingClient.end();
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+      return;
+    }
+
+    setSeconds(0);
+    let client: VoiceClient;
+    client = new VoiceClient({
+      onState: (state) => {
+        if (state === "closed") {
+          if (voiceRef.current === client) {
+            voiceRef.current = undefined;
+            setEntries([]);
+            setSeconds(0);
+          }
+          setVoiceState("idle");
+          return;
+        }
+        setVoiceState(state);
+      },
       onLevel: (level) => levelListener.current?.(level),
       onMessage: (message) => {
         const toolName = message.name ?? message.tool_name;
-        if (message.type === "server.event.tool_call" && toolName) {
+        const text = message.content ?? message.text;
+        if (message.role === "user" && text) {
+          inactivityLanguage.current = languageFromText(text, languageFromBrowser());
+        }
+        if (message.type === "server.action.interaction_end") {
+          append("agent", inactivityMessages[inactivityLanguage.current]);
+        }
+        if (
+          (message.type === "server.event.tool_call" || message.type === "browser_tool_call") &&
+          toolName
+        ) {
           const args = message.arguments ?? message.parameters;
           const action = describeWebsiteTool(toolName, args);
           if (action) append("action", action);
-          void executeWebsiteTool(toolName, args).then((result) =>
-            client.sendToolResult(toolName, result),
-          );
+          void executeWebsiteTool(toolName, args)
+            .then((result) => client.sendToolResult(toolName, result, message.request_id))
+            .catch((error) =>
+              client.sendToolResult(
+                toolName,
+                { error: error instanceof Error ? error.message : String(error) },
+                message.request_id,
+              ),
+            );
         }
-        const text = message.content ?? message.text;
         if (text) append(message.role === "user" ? "user" : "agent", text);
         if (message.type === "error") {
           setError(message.message ?? "The conversation could not start.");
@@ -238,12 +336,12 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     try {
       await client.start(getWebsiteContext());
     } catch (cause) {
-      client.stop();
+      client.end();
       voiceRef.current = undefined;
       setVoiceState("idle");
       setError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [append]);
+  }, [append, voiceState]);
 
   const hostname = (() => {
     try {
@@ -261,7 +359,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             className="nub"
             type="button"
             onClick={() => tuck(false)}
-            aria-label={isLive ? "Show Bakbak, session live" : "Show Bakbak"}
+            aria-label={isLive ? "Show Bakbak, session live" : isPaused ? "Show Bakbak, conversation paused" : "Show Bakbak"}
           >
             {isLive ? <span className="nub-dot" aria-hidden="true" /> : null}
           </button>
@@ -285,13 +383,13 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               className={`launcher t-tt-trigger ${isLive ? "launcher-live" : ""}`}
               type="button"
               onClick={() => setIsOpen(true)}
-              aria-label={isLive ? "Open Bakbak, session live" : "Open Bakbak"}
+              aria-label={isLive ? "Open Bakbak, session live" : isPaused ? "Open Bakbak, conversation paused" : "Open Bakbak"}
             >
               <MicrophoneIcon className="icon" aria-hidden="true" />
               {isLive ? <LiveRing subscribe={subscribeToLevel} /> : null}
             </button>
             <span className="t-tt" role="tooltip">
-              {isLive ? `Bakbak · ${formatDuration(seconds)}` : "Bakbak"}
+              {isLive ? `Bakbak · ${formatDuration(seconds)}` : isPaused ? "Bakbak · paused" : "Bakbak"}
             </span>
           </span>
         </div>
@@ -323,14 +421,14 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
               <StateLabel label={stateLabel[voiceState]} />
             )}
           </p>
-          {isLive ? <time className="elapsed">{formatDuration(seconds)}</time> : null}
+          {hasConversation ? <time className="elapsed">{formatDuration(seconds)}</time> : null}
           <button
             className="button-ghost"
             type="button"
             onClick={close}
-            aria-label={isLive ? "Minimise, keep session running" : "Close Bakbak"}
+            aria-label={isLive ? "Minimise, keep conversation running" : isPaused ? "Minimise, keep conversation paused" : "Close Bakbak"}
           >
-            {isLive ? (
+            {hasConversation ? (
               <MinusIcon className="icon" aria-hidden="true" />
             ) : (
               <XMarkIcon className="icon" aria-hidden="true" />
@@ -384,14 +482,32 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         <footer className="panel-footer">
           {isLive ? (
             <Meter subscribe={subscribeToLevel} />
+          ) : isPaused ? (
+            <p className="footer-note">Conversation paused. Resume when you&apos;re ready.</p>
           ) : (
             <p className="footer-note">Mic opens only while a session is live.</p>
           )}
           {isLive ? (
-            <button className="button-secondary" type="button" onClick={stop}>
-              <StopIcon className="icon" aria-hidden="true" />
-              Stop
-            </button>
+            <>
+              <button className="button-secondary" type="button" onClick={() => void pause()}>
+                <PauseIcon className="icon" aria-hidden="true" />
+                Pause
+              </button>
+              <button className="button-end" type="button" onClick={endConversation} aria-label="End conversation">
+                End
+              </button>
+            </>
+          ) : isPaused ? (
+            <>
+              <button className="button-end" type="button" onClick={endConversation} aria-label="End conversation">
+                <StopIcon className="icon" aria-hidden="true" />
+                End
+              </button>
+              <button className="button-primary" type="button" onClick={() => void start()}>
+                <MicrophoneIcon className="icon" aria-hidden="true" />
+                Resume
+              </button>
+            </>
           ) : (
             <button
               className="button-primary"
