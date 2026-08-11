@@ -182,6 +182,7 @@ const socketUrl = (token: string) => {
 };
 
 const interactionEndType = 'server.action.interaction_end';
+const reconnectDelays = [1000, 2000];
 
 async function getSessionToken() {
   return send({ type: 'session-token' });
@@ -189,7 +190,7 @@ async function getSessionToken() {
 
 export type VoiceClientCallbacks = {
   onMessage: (message: VoiceMessage) => void;
-  onState: (state: 'connecting' | 'connected' | 'paused' | 'closed') => void;
+  onState: (state: 'connecting' | 'connected' | 'reconnecting' | 'paused' | 'closed') => void;
   onLevel?: (level: number) => void;
   onError?: (message: string) => void;
 };
@@ -474,6 +475,9 @@ export class VoiceClient {
   private isReady = false;
   private isClosed = false;
   private isPaused = false;
+  private context?: WebsiteContext;
+  private reconnectAttempt = 0;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingAcknowledgement?: {
     type: 'paused' | 'resumed';
     resolve: () => void;
@@ -484,19 +488,30 @@ export class VoiceClient {
   constructor(private readonly callbacks: VoiceClientCallbacks) {}
 
   async start(context: WebsiteContext) {
-    const { url, token } = socketUrl(await getSessionToken());
+    this.context = context;
     this.isClosed = false;
     this.isPaused = false;
     this.isReady = false;
+    this.reconnectAttempt = 0;
     this.callbacks.onState('connecting');
-    this.socket = new WebSocket(url, ['bearer', token]);
-    this.socket.addEventListener('message', (event) => {
+    await this.connect();
+    if (!this.isClosed) await this.startAudioCapture();
+  }
+
+  private async connect() {
+    const { url, token } = socketUrl(await getSessionToken());
+    if (this.isClosed) return;
+    const socket = new WebSocket(url, ['bearer', token]);
+    this.socket = socket;
+    socket.addEventListener('message', (event) => {
+      if (this.socket !== socket || this.isClosed) return;
       const message = JSON.parse(String(event.data)) as VoiceMessage;
       if (message.type === 'context_required') {
-        this.socket?.send(JSON.stringify({ type: 'init', context }));
+        if (this.context) socket.send(JSON.stringify({ type: 'init', context: this.context }));
       }
       if (message.type === 'ready') {
         this.isReady = true;
+        this.reconnectAttempt = 0;
         this.callbacks.onState('connected');
       }
       if (message.type === 'paused') {
@@ -511,9 +526,9 @@ export class VoiceClient {
       }
       if (message.type === interactionEndType) {
         this.finish();
+        socket.close();
       }
       if (message.type === 'error') {
-        const socket = this.socket;
         this.callbacks.onError?.(message.message ?? 'The conversation could not continue.');
         this.finish();
         socket?.close();
@@ -526,13 +541,8 @@ export class VoiceClient {
       }
       this.callbacks.onMessage(message);
     });
-    this.socket.addEventListener('close', () => this.finish());
-    this.socket.addEventListener('error', () => {
-      this.callbacks.onError?.('WebSocket connection error.');
-      this.finish();
-    });
-
-    await this.startAudioCapture();
+    socket.addEventListener('close', () => this.handleSocketClosed(socket));
+    socket.addEventListener('error', () => socket.close());
   }
 
   async pause() {
@@ -626,12 +636,40 @@ export class VoiceClient {
     this.pendingAcknowledgement = undefined;
   }
 
+  private handleSocketClosed(socket?: WebSocket) {
+    if (socket && this.socket !== socket) return;
+    this.socket = undefined;
+    this.isReady = false;
+    if (this.isClosed) return;
+    if (this.isPaused || !this.context) {
+      this.finish();
+      return;
+    }
+    if (this.reconnectAttempt >= reconnectDelays.length) {
+      this.callbacks.onError?.('Connection lost. Press Start to begin a new session.');
+      this.finish();
+      return;
+    }
+    if (this.reconnectTimer) return;
+    const delay = reconnectDelays[this.reconnectAttempt++];
+    this.callbacks.onState('reconnecting');
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      void this.connect().catch(() => this.handleSocketClosed());
+    }, delay);
+  }
+
   private finish() {
     if (this.isClosed) return;
     this.isClosed = true;
     this.isReady = false;
     this.isPaused = false;
+    this.context = undefined;
     this.socket = undefined;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     if (this.pendingAcknowledgement) {
       clearTimeout(this.pendingAcknowledgement.timeout);
       this.pendingAcknowledgement.reject(new Error('The conversation ended.'));
