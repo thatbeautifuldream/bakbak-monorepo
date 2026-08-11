@@ -277,6 +277,19 @@
   font-size: 0.6875rem;
 }
 
+.scope-safe {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--bak-danger-bg);
+  color: var(--bak-danger);
+  font-family: var(--bak-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+
 /* Log */
 
 .empty,
