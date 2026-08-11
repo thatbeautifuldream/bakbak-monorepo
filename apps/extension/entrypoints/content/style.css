@@ -249,6 +249,12 @@
 
 .button-ghost:hover { background: var(--bak-well); color: var(--bak-fg); }
 
+.reading-mode-toggle {
+  font-family: var(--bak-font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
 /* Page scope */
 
 .scope {
@@ -552,6 +558,43 @@
 .button-end { background: transparent; color: var(--bak-muted); }
 .button-end:hover { background: var(--bak-danger-bg); color: var(--bak-danger); }
 
+.panel-reading-mode .scope-title {
+  font-size: 0.9375rem;
+}
+
+.panel-reading-mode .scope-host,
+.panel-reading-mode .translation-label,
+.panel-reading-mode .news-trust-heading span,
+.panel-reading-mode .news-trust dt,
+.panel-reading-mode .who {
+  font-size: 0.75rem;
+}
+
+.panel-reading-mode .translation p,
+.panel-reading-mode .news-trust dd,
+.panel-reading-mode .news-trust-heading p,
+.panel-reading-mode .footer-note {
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+.panel-reading-mode .empty p,
+.panel-reading-mode .entry p {
+  font-size: 0.9375rem;
+  line-height: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @keyframes bak-pulse {
   50% { opacity: 0.35; }
 }
@@ -663,9 +706,11 @@
 .t-tt {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translate(-50%, 0) scale(var(--tt-scale));
-  transform-origin: 50% 100%;
+  right: 0;
+  max-width: calc(100vw - 24px);
+  transform: scale(var(--tt-scale));
+  transform-origin: 100% 100%;
+  overflow: hidden;
   border-radius: var(--bak-radius);
   background: var(--tt-bg);
   box-shadow: var(--bak-shadow);
@@ -675,6 +720,7 @@
   font-weight: 500;
   opacity: 0;
   pointer-events: none;
+  text-overflow: ellipsis;
   white-space: nowrap;
   transition:
     opacity var(--tt-out-dur) var(--tt-out-ease),
@@ -683,7 +729,7 @@
 
 .t-tt-wrap:hover .t-tt,
 .t-tt-trigger:focus-visible + .t-tt {
-  transform: translate(-50%, 0) scale(1);
+  transform: scale(1);
   opacity: 1;
   transition-delay: var(--tt-delay);
   transition-duration: var(--tt-in-dur);

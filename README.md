@@ -40,7 +40,7 @@ Because the voice layer is multilingual, it also makes the web more legible acro
 | Extension | WXT + React |
 | Website | Next.js 16 + React 19 + Tailwind CSS v4 |
 | API | Express 5 + express-zod-api |
-| Auth | Better Auth (email/password + Google) |
+| Auth | Better Auth (email/password) |
 | Database | PostgreSQL + Drizzle ORM |
 | Voice | Sarvam Conversational AI |
 | Type safety | Hey API (OpenAPI → typed SDK + React Query) |
@@ -85,13 +85,13 @@ packages/api-client/   Typed SDK generated from the API's OpenAPI spec
 | `BETTER_AUTH_SECRET` | Yes | Secret key for auth |
 | `BETTER_AUTH_URL` | Yes | API base URL |
 | `TRUSTED_ORIGINS` | Yes | Comma-separated allowed origins |
-| `WEB_APP_URL` | Yes | Website URL, used for OAuth callbacks |
+| `WEB_APP_URL` | Yes | Frontend URL for callbacks |
 | `SARVAM_CONVERSATIONS_API_KEY` | Yes for voice | Sarvam Conversations API key |
 | `SARVAM_VOICE_AGENT_ID` | Yes for voice | Sarvam voice-agent app ID |
 | `SARVAM_ORG_ID` | Yes for voice | Sarvam organization ID |
 | `SARVAM_WORKSPACE_ID` | Yes for voice | Sarvam workspace ID |
 | `SARVAM_TOOL_SECRET` | Yes for browser tools | Bearer secret configured on Sarvam API tools |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | No | Google sign-in |
+| `ANALYTICS_HASH_SECRET` | Yes for analytics | Secret used to pseudonymise extension installations |
 
 ### Website (`apps/website/.env`)
 

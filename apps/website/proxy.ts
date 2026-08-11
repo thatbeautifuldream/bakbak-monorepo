@@ -4,6 +4,7 @@ import { getSessionCookie } from "better-auth/cookies"
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/analytics",
 ]
 
 const ANON_ONLY_PATHS = ["/", "/login", "/signup"]

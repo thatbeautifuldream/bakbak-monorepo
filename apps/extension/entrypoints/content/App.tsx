@@ -16,7 +16,8 @@ import {
   XMarkIcon,
 } from "@heroicons/react/16/solid";
 import type { ContentScriptContext } from "#imports";
-import { openLogin } from "@/lib/messages";
+import { trackVoiceStarted } from "@/lib/analytics";
+import { openLogin, takeVoiceSessionForNavigation } from "@/lib/messages";
 import {
   describeWebsiteTool,
   executeWebsiteTool,
@@ -35,6 +36,21 @@ type Entry = { id: number; kind: "user" | "agent" | "action"; text: string };
 const CLOSE_MS = 150;
 const METER_BARS = 5;
 const TUCK_KEY = "bakbak:tucked";
+const READING_MODE_KEY = "bakbak:reading-mode";
+const microphonePolicyMessage = "This page blocks microphone access. This isn’t a Chrome permission setting.";
+
+type FeaturePolicy = {
+  allowsFeature: (feature: string) => boolean;
+};
+
+const pageBlocksMicrophone = () => {
+  const pageDocument = document as Document & {
+    featurePolicy?: FeaturePolicy;
+    permissionsPolicy?: FeaturePolicy;
+  };
+  const policy = pageDocument.permissionsPolicy ?? pageDocument.featurePolicy;
+  return policy?.allowsFeature("microphone") === false;
+};
 
 const inactivityMessages = {
   en: "I haven't heard a response, so this session has ended. I'm here whenever you're ready — press Start to talk again.",
@@ -169,6 +185,7 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const [isRevealed, setIsRevealed] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isTucked, setIsTucked] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
   const [title, setTitle] = useState(() => document.title || "Untitled page");
   const [websiteSafety, setWebsiteSafety] = useState(getWebsiteSafety);
   const [translation, setTranslation] = useState<TranslationView | null>(null);
@@ -180,8 +197,10 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
   const panelRef = useRef<HTMLElement>(null);
   const logRef = useRef<HTMLOListElement>(null);
   const voiceRef = useRef<VoiceClient | undefined>(undefined);
+  const startRef = useRef<(resumeSessionId?: string) => Promise<void>>(async () => undefined);
   const entryId = useRef(0);
   const inactivityLanguage = useRef<InactivityLanguage>(languageFromBrowser());
+  const voiceStartTracked = useRef(false);
   const wasReconnecting = useRef(false);
   const levelListener = useRef<((level: number) => void) | undefined>(
     undefined,
@@ -232,10 +251,13 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       setWebsiteSafety(getWebsiteSafety());
       setTranslation(null);
       setNewsTrust(null);
+      const client = voiceRef.current;
+      if (client) {
+        setTimeout(() => client.updateContext(getWebsiteContext()), 0);
+        return;
+      }
       setEntries([]);
       setError(null);
-      voiceRef.current?.end();
-      voiceRef.current = undefined;
       setVoiceState("idle");
       setSeconds(0);
     });
@@ -265,13 +287,37 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
   useEffect(() => {
     void browser.storage.local
-      .get(TUCK_KEY)
-      .then((stored) => setIsTucked(stored[TUCK_KEY] === true));
+      .get([TUCK_KEY, READING_MODE_KEY])
+      .then((stored) => {
+        setIsTucked(stored[TUCK_KEY] === true);
+        setReadingMode(stored[READING_MODE_KEY] === true);
+      });
   }, []);
 
   const tuck = useCallback((tucked: boolean) => {
     setIsTucked(tucked);
     void browser.storage.local.set({ [TUCK_KEY]: tucked });
+  }, []);
+
+  const toggleReadingMode = useCallback(() => {
+    setReadingMode((current) => {
+      const next = !current;
+      void browser.storage.local.set({ [READING_MODE_KEY]: next });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const openWithShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditing = target instanceof HTMLElement
+        && (target.isContentEditable || Boolean(target.closest('input, textarea, select, [contenteditable="true"]')));
+      if (isEditing || event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.code !== "KeyB") return;
+      event.preventDefault();
+      setIsOpen(true);
+    };
+    window.addEventListener("keydown", openWithShortcut, true);
+    return () => window.removeEventListener("keydown", openWithShortcut, true);
   }, []);
 
   const close = useCallback(() => {
@@ -304,22 +350,29 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     setError(null);
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (resumeSessionId?: string) => {
     setError(null);
     setWebsiteSafety(getWebsiteSafety());
     wasReconnecting.current = false;
+    if (pageBlocksMicrophone()) {
+      setError(microphonePolicyMessage);
+      return;
+    }
     const existingClient = voiceRef.current;
     if (voiceState === "paused" && existingClient) {
       try {
         await existingClient.resume();
       } catch (cause) {
         existingClient.end();
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(pageBlocksMicrophone()
+          ? microphonePolicyMessage
+          : cause instanceof Error ? cause.message : String(cause));
       }
       return;
     }
 
     setSeconds(0);
+    voiceStartTracked.current = false;
     let client: VoiceClient;
     client = new VoiceClient({
       onState: (state) => {
@@ -341,6 +394,10 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           wasReconnecting.current = false;
           append("action", "Reconnected. You can keep talking.");
         }
+        if (state === "connected" && !voiceStartTracked.current) {
+          voiceStartTracked.current = true;
+          trackVoiceStarted();
+        }
         setVoiceState(state);
       },
       onLevel: (level) => levelListener.current?.(level),
@@ -361,7 +418,27 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
           const action = describeWebsiteTool(toolName, args);
           if (action) append("action", action);
           void executeWebsiteTool(toolName, args)
-            .then((result) => client.sendToolResult(toolName, result, message.request_id))
+            .then(async (result) => {
+              const navigationUrl = "navigation_url" in result && typeof result.navigation_url === "string"
+                ? result.navigation_url
+                : toolName === "navigate_to_page" && "url" in result && typeof result.url === "string"
+                  ? result.url
+                  : undefined;
+              if ("ok" in result && result.ok === true && navigationUrl) {
+                if (!(await client.prepareForNavigation())) {
+                  client.sendToolResult(
+                    toolName,
+                    { error: "The voice session could not be preserved for navigation." },
+                    message.request_id,
+                  );
+                  return;
+                }
+                client.sendToolResult(toolName, result, message.request_id);
+                setTimeout(() => location.assign(navigationUrl), 100);
+                return;
+              }
+              client.sendToolResult(toolName, result, message.request_id);
+            })
             .catch((error) =>
               client.sendToolResult(
                 toolName,
@@ -379,14 +456,27 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
     });
     voiceRef.current = client;
     try {
-      await client.start(getWebsiteContext());
+      await client.start(getWebsiteContext(), resumeSessionId);
     } catch (cause) {
       client.end();
       voiceRef.current = undefined;
       setVoiceState("idle");
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(pageBlocksMicrophone()
+        ? microphonePolicyMessage
+        : cause instanceof Error ? cause.message : String(cause));
     }
   }, [append, voiceState]);
+  startRef.current = start;
+
+  useEffect(() => {
+    let cancelled = false;
+    void takeVoiceSessionForNavigation().then((resumeSessionId) => {
+      if (!cancelled && resumeSessionId && !voiceRef.current) void startRef.current(resumeSessionId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const hostname = (() => {
     try {
@@ -395,6 +485,9 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
       return "this page";
     }
   })();
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const shortcutLabel = isMac ? "⌥B" : "Alt+B";
+  const shortcutAriaLabel = isMac ? "Option and B" : "Alt and B";
 
   if (!isOpen) {
     if (isTucked) {
@@ -448,8 +541,8 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
         ref={panelRef}
         tabIndex={-1}
         data-origin="bottom-right"
-        className={`panel t-dropdown ${isClosing ? "is-closing" : isRevealed ? "is-open" : ""}`}
-        aria-label="Bakbak"
+        className={`panel t-dropdown ${readingMode ? "panel-reading-mode" : ""} ${isClosing ? "is-closing" : isRevealed ? "is-open" : ""}`}
+        aria-label={`Bakbak voice assistant. Press ${shortcutAriaLabel} to open this panel.`}
         onKeyDown={(event) => event.key === "Escape" && close()}
       >
         <header className="panel-header">
@@ -467,6 +560,16 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
             )}
           </p>
           {hasConversation ? <time className="elapsed">{formatDuration(seconds)}</time> : null}
+          <button
+            className="button-ghost reading-mode-toggle"
+            type="button"
+            onClick={toggleReadingMode}
+            aria-label={readingMode ? "Use standard text size" : "Use larger reading text"}
+            aria-pressed={readingMode}
+            title={readingMode ? "Standard text size" : "Larger reading text"}
+          >
+            <span aria-hidden="true">A+</span>
+          </button>
           <button
             className="button-ghost"
             type="button"
@@ -527,10 +630,10 @@ function App({ ctx }: { ctx: ContentScriptContext }) {
 
         {entries.length === 0 ? (
           <div className="empty">
-            <p>Ask about this page, or have Bakbak find and click through it.</p>
+            <p>Ask about this page, or have Bakbak find and click through it. Press {shortcutLabel} any time to open Bakbak.</p>
           </div>
         ) : (
-          <ol className="log" ref={logRef} role="list">
+          <ol className="log" ref={logRef} role="list" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
             {entries.map((entry) => (
               <li key={entry.id} className={`entry entry-${entry.kind}`}>
                 {entry.kind === "action" ? null : (

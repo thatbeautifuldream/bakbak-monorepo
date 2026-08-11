@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { fromNodeHeaders } from "better-auth/node";
-import { bearer, oAuthProxy } from "better-auth/plugins";
+import { bearer } from "better-auth/plugins";
 import { defaultEndpointsFactory, Middleware } from "express-zod-api";
 import createError from "http-errors";
 import { db } from "./db/index.js";
@@ -15,21 +15,8 @@ const trustedOrigins = (
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-const webAppUrl = process.env.WEB_APP_URL ?? "http://localhost:3001";
-
-const googleProvider =
-  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-    ? {
-        google: {
-          clientId: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          redirectURI: `${webAppUrl}/api/auth/callback/google`,
-        },
-      }
-    : undefined;
-
 export const auth = betterAuth({
-  appName: process.env.APP_NAME ?? "MyApp",
+  appName: process.env.APP_NAME ?? "Bakbak",
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   trustedOrigins,
   advanced: {
@@ -64,8 +51,7 @@ export const auth = betterAuth({
       },
     },
   },
-  socialProviders: googleProvider,
-  plugins: [oAuthProxy(), bearer()],
+  plugins: [bearer()],
   user: {
     additionalFields: {
       role: {

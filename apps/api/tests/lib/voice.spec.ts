@@ -63,6 +63,27 @@ describe("voice session lifecycle", () => {
     );
   });
 
+  test("sends acknowledgements through the replacement socket after a reconnect", async () => {
+    const agent = createAgent();
+    const firstSocket = createSocket();
+    const replacementSocket = createSocket();
+    let activeSocket = firstSocket;
+    const session = createVoiceSession({
+      agent: agent as never,
+      getSocket: () => activeSocket as never,
+      onCleanup: vi.fn(),
+      onToolResult: vi.fn(),
+    });
+
+    activeSocket = replacementSocket;
+    await session.handleMessage({ type: "pause" });
+
+    expect(firstSocket.send).not.toHaveBeenCalled();
+    expect(replacementSocket.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "paused" }),
+    );
+  });
+
   test("cleans up an unexpected socket close", async () => {
     const agent = createAgent();
     const socket = createSocket();
